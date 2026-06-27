@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in — Reading Log</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <script>
+    (function(){ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAttribute('data-theme',t); })();
+  </script>
+</head>
+<body class="auth-page">
+
+  <main class="auth-main">
+    <h1 class="auth-logo">Reading Log</h1>
+
+    <div class="auth-tabs" role="tablist">
+      <button class="auth-tab active" data-tab="signin"  role="tab" aria-selected="true">Sign in</button>
+      <button class="auth-tab"        data-tab="register" role="tab" aria-selected="false">Create account</button>
+    </div>
+
+    <div class="card auth-card">
+      <form id="auth-form" novalidate>
+        <div class="auth-field">
+          <label class="auth-label" for="username">Username</label>
+          <input class="auth-input" id="username" type="text"
+            autocomplete="username" autocapitalize="none" spellcheck="false" required>
+          <p class="auth-hint" id="username-hint" hidden>
+            3–20 characters. Lowercase letters, numbers, underscores only.
+          </p>
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="password">Password</label>
+          <input class="auth-input" id="password" type="password"
+            autocomplete="current-password" required>
+          <p class="auth-hint" id="password-hint" hidden>
+            At least 6 characters.
+          </p>
+        </div>
+        <div class="auth-error" id="auth-error" hidden></div>
+        <button class="auth-submit" id="auth-submit" type="submit">Sign in</button>
+      </form>
+    </div>
+  </main>
+
+  <script type="module">
+    import { signIn, signUp, onAuth } from '/js/firebase.js';
+
+    // Redirect already-authenticated users immediately
+    onAuth(user => { if (user) window.location.replace('/'); });
+
+    // ── Tab switching ─────────────────────────────────────────────────────────
+    let mode = 'signin';
+    const tabs       = document.querySelectorAll('.auth-tab');
+    const submitBtn  = document.getElementById('auth-submit');
+    const passInput  = document.getElementById('password');
+    const usernameHint = document.getElementById('username-hint');
+    const passwordHint = document.getElementById('password-hint');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        mode = tab.dataset.tab;
+        tabs.forEach(t => {
+          t.classList.toggle('active', t === tab);
+          t.setAttribute('aria-selected', t === tab);
+        });
+        submitBtn.textContent        = mode === 'signin' ? 'Sign in' : 'Create account';
+        passInput.autocomplete       = mode === 'signin' ? 'current-password' : 'new-password';
+        usernameHint.hidden          = mode === 'signin';
+        passwordHint.hidden          = mode === 'signin';
+        document.getElementById('auth-error').hidden = true;
+      });
+    });
+
+    // ── Form submission ───────────────────────────────────────────────────────
+    document.getElementById('auth-form').addEventListener('submit', async e => {
+      e.preventDefault();
+
+      const username  = document.getElementById('username').value.trim().toLowerCase();
+      const password  = document.getElementById('password').value;
+      const errorEl   = document.getElementById('auth-error');
+
+      errorEl.hidden      = true;
+      submitBtn.disabled  = true;
+      submitBtn.textContent = mode === 'signin' ? 'Signing in…' : 'Creating account…';
+
+      try {
+        if (mode === 'signin') {
+          await signIn(username, password);
+        } else {
+          await signUp(username, password);
+        }
+        window.location.replace('/');
+      } catch (err) {
+        errorEl.textContent   = friendlyError(err);
+        errorEl.hidden        = false;
+        submitBtn.disabled    = false;
+        submitBtn.textContent = mode === 'signin' ? 'Sign in' : 'Create account';
+      }
+    });
+
+    function friendlyError(err) {
+      const code = err.code || '';
+      if (code.includes('user-not-found') || code.includes('wrong-password') || code.includes('invalid-credential')) {
+        return 'Invalid username or password.';
+      }
+      if (code.includes('weak-password'))     return 'Password must be at least 6 characters.';
+      if (code.includes('too-many-requests')) return 'Too many attempts. Please try again later.';
+      return err.message || 'Something went wrong. Please try again.';
+    }
+  </script>
+</body>
+</html>

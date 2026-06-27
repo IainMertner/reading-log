@@ -32,16 +32,12 @@
       <div class="settings-group-label">Account</div>
       <div class="settings-list">
         <div class="settings-row">
-          <span class="settings-row-label">Display name</span>
-          <span class="settings-row-value">Iain</span>
+          <span class="settings-row-label">Username</span>
+          <span class="settings-row-value" id="settings-username">—</span>
         </div>
         <div class="settings-row">
-          <span class="settings-row-label">Email</span>
-          <span class="settings-row-value">phixel66@gmail.com</span>
-        </div>
-        <div class="settings-row">
-          <span class="settings-row-label">Password</span>
-          <span class="settings-row-value">Change</span>
+          <span class="settings-row-label">Sign out</span>
+          <button class="btn-danger" id="signout-btn">Sign out</button>
         </div>
       </div>
     </div>
@@ -169,6 +165,25 @@
   </nav>
 
   <script src="../js/main.js"></script>
+  <script>document.body.classList.add('auth-loading');</script>
+  <script type="module">
+    import { requireAuth } from '/js/auth.js';
+    import { logOut } from '/js/firebase.js';
+
+    try {
+      const { profile } = await requireAuth();
+      if (profile) {
+        document.getElementById('settings-username').textContent = profile.username;
+      }
+    } finally {
+      document.body.classList.remove('auth-loading');
+    }
+
+    document.getElementById('signout-btn').addEventListener('click', async () => {
+      await logOut();
+      window.location.replace('/login/');
+    });
+  </script>
   <script>
     // Sync theme select with current stored value
     const sel = document.getElementById('theme-select');

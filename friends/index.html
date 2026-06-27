@@ -29,40 +29,19 @@
     <a class="back-link" href="../profile/">← Profile</a>
     <h1 class="page-title">Friends</h1>
 
-    <div class="card">
-      <div class="friend-item">
-        <div class="friend-avatar">S</div>
-        <div class="friend-name">Sarah</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="friend-item">
-        <div class="friend-avatar">J</div>
-        <div class="friend-name">James</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="friend-item">
-        <div class="friend-avatar">M</div>
-        <div class="friend-name">Meg</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="friend-item">
-        <div class="friend-avatar">R</div>
-        <div class="friend-name">Rob</div>
-      </div>
+    <div id="friends-list">
+      <!-- populated by script -->
     </div>
 
     <div class="add-friend card">
       <div class="add-friend-label">Add a friend</div>
       <div class="join-club-row">
-        <input class="join-club-input" type="text" placeholder="Search by name or username" autocomplete="off">
-        <button class="join-club-btn">Search</button>
+        <input class="join-club-input" id="friend-input" type="text"
+          placeholder="Their username" autocomplete="off" autocapitalize="none" spellcheck="false">
+        <button class="join-club-btn" id="friend-btn">Add</button>
       </div>
+      <p class="auth-error" id="friend-error" hidden style="margin-top:.6rem;margin-bottom:0"></p>
+      <p class="auth-hint" id="friend-ok"    hidden style="margin-top:.4rem;color:var(--accent)"></p>
     </div>
 
   </main>
@@ -107,5 +86,76 @@
   </nav>
 
   <script src="../js/main.js"></script>
+  <script>document.body.classList.add('auth-loading');</script>
+  <script type="module">
+    import { requireAuth } from '/js/auth.js';
+    import { getFriends, addFriend } from '/js/firebase.js';
+
+    const { user } = await requireAuth();
+    const list = document.getElementById('friends-list');
+
+    function renderFriend(profile) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.uid = profile.uid;
+      card.innerHTML = `<div class="friend-item">
+        <div class="friend-avatar">${profile.username[0].toUpperCase()}</div>
+        <div class="friend-name">${profile.username}</div>
+      </div>`;
+      return card;
+    }
+
+    function showEmpty() {
+      const msg = document.createElement('p');
+      msg.id = 'friends-empty';
+      msg.style.cssText = 'color:var(--text-muted);font-size:.875rem;margin-bottom:.625rem';
+      msg.textContent = 'No friends yet. Add someone below!';
+      list.appendChild(msg);
+    }
+
+    const friends = await getFriends(user.uid);
+    if (friends.length === 0) {
+      showEmpty();
+    } else {
+      friends.forEach(f => list.appendChild(renderFriend(f)));
+    }
+
+    document.body.classList.remove('auth-loading');
+
+    // ── Add friend ──────────────────────────────────────────────────────────
+    const input    = document.getElementById('friend-input');
+    const btn      = document.getElementById('friend-btn');
+    const errorEl  = document.getElementById('friend-error');
+    const okEl     = document.getElementById('friend-ok');
+
+    btn.addEventListener('click', async () => {
+      const username = input.value.trim().toLowerCase();
+      if (!username) return;
+
+      errorEl.hidden = true;
+      okEl.hidden    = true;
+      btn.disabled   = true;
+      btn.textContent = 'Adding…';
+
+      try {
+        const friend = await addFriend(user.uid, username);
+
+        document.getElementById('friends-empty')?.remove();
+        list.appendChild(renderFriend(friend));
+
+        okEl.textContent = `${friend.username} added!`;
+        okEl.hidden      = false;
+        input.value      = '';
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.hidden      = false;
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = 'Add';
+      }
+    });
+
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
+  </script>
 </body>
 </html>

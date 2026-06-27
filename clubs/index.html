@@ -28,28 +28,6 @@
   <main class="page-content">
     <h1 class="page-title">Book Clubs</h1>
 
-    <div class="card">
-      <div class="club-card">
-        <div class="club-icon">📚</div>
-        <div>
-          <div class="club-name">Sci-Fi Sundays</div>
-          <div class="club-meta">6 members</div>
-          <div class="club-current">Currently reading: <strong>A Fire Upon the Deep</strong></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="club-card">
-        <div class="club-icon">🕵️</div>
-        <div>
-          <div class="club-name">Cosy Crime Corner</div>
-          <div class="club-meta">4 members</div>
-          <div class="club-current">Currently reading: <strong>The Thursday Murder Club</strong></div>
-        </div>
-      </div>
-    </div>
-
     <div class="join-club card">
       <div class="join-club-label">Join a club</div>
       <div class="join-club-row">
@@ -100,5 +78,11 @@
   </nav>
 
   <script src="../js/main.js"></script>
+  <script>document.body.classList.add('auth-loading');</script>
+  <script type="module">
+    import { requireAuth } from '/js/auth.js';
+    await requireAuth();
+    document.body.classList.remove('auth-loading');
+  </script>
 </body>
 </html>

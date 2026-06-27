@@ -143,6 +143,12 @@
   </nav>
 
   <script src="../js/main.js"></script>
+  <script>document.body.classList.add('auth-loading');</script>
+  <script type="module">
+    import { requireAuth } from '/js/auth.js';
+    await requireAuth();
+    document.body.classList.remove('auth-loading');
+  </script>
   <script>
     document.querySelectorAll('.star-rating').forEach(group => {
       const stars = group.querySelectorAll('.star');

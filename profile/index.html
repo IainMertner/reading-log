@@ -30,11 +30,10 @@
 
     <div class="profile-card card">
       <div class="profile-avatar-wrap">
-        <div class="profile-avatar-lg">I</div>
-        <button class="profile-avatar-change">Change photo</button>
+        <div class="profile-avatar-lg" id="profile-avatar"></div>
       </div>
       <div class="profile-name-wrap">
-        <div class="profile-name">Iain</div>
+        <div class="profile-name" id="profile-name"></div>
       </div>
     </div>
 
@@ -97,5 +96,18 @@
   </nav>
 
   <script src="../js/main.js"></script>
+  <script>document.body.classList.add('auth-loading');</script>
+  <script type="module">
+    import { requireAuth } from '/js/auth.js';
+    try {
+      const { profile } = await requireAuth();
+      if (profile) {
+        document.getElementById('profile-avatar').textContent = profile.username[0].toUpperCase();
+        document.getElementById('profile-name').textContent   = profile.username;
+      }
+    } finally {
+      document.body.classList.remove('auth-loading');
+    }
+  </script>
 </body>
 </html>

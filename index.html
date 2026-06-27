@@ -28,60 +28,6 @@
   <main class="page-content">
     <h1 class="page-title">Home</h1>
 
-    <div class="card">
-      <div class="feed-item">
-        <div class="feed-avatar">S</div>
-        <div class="feed-body">
-          <div class="feed-user">Sarah</div>
-          <div class="feed-action">finished <span class="feed-book">The Thursday Murder Club</span></div>
-          <div class="feed-time">2 hours ago</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="feed-item">
-        <div class="feed-avatar">J</div>
-        <div class="feed-body">
-          <div class="feed-user">James</div>
-          <div class="feed-action">is reading <span class="feed-book">Project Hail Mary</span> — 34% done</div>
-          <div class="feed-time">5 hours ago</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="feed-item">
-        <div class="feed-avatar">📚</div>
-        <div class="feed-body">
-          <div class="feed-user">Sci-Fi Sundays</div>
-          <div class="feed-action">voted for their next read: <span class="feed-book">A Fire Upon the Deep</span></div>
-          <div class="feed-time">Yesterday</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="feed-item">
-        <div class="feed-avatar">M</div>
-        <div class="feed-body">
-          <div class="feed-user">Meg</div>
-          <div class="feed-action">added <span class="feed-book">Tomorrow, and Tomorrow, and Tomorrow</span> to her list</div>
-          <div class="feed-time">Yesterday</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="feed-item">
-        <div class="feed-avatar">R</div>
-        <div class="feed-body">
-          <div class="feed-user">Rob</div>
-          <div class="feed-action">gave <span class="feed-book">Demon Copperhead</span> ★★★★★</div>
-          <div class="feed-time">2 days ago</div>
-        </div>
-      </div>
-    </div>
 
   </main>
 
@@ -125,5 +71,11 @@
   </nav>
 
   <script src="js/main.js"></script>
+  <script>document.body.classList.add('auth-loading');</script>
+  <script type="module">
+    import { requireAuth } from '/js/auth.js';
+    await requireAuth();
+    document.body.classList.remove('auth-loading');
+  </script>
 </body>
 </html>
