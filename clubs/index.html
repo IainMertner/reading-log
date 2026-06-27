@@ -80,9 +80,8 @@
   <script src="../js/main.js"></script>
   <script>document.body.classList.add('auth-loading');</script>
   <script type="module">
-    import { requireAuth } from '/js/auth.js';
-    await requireAuth();
-    document.body.classList.remove('auth-loading');
+    import { requireAuth } from '../js/auth.js';
+    try { await requireAuth(); } finally { document.body.classList.remove('auth-loading'); }
   </script>
 </body>
 </html>

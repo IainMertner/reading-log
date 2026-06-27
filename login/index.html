@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sign in — Reading Log</title>
-  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="../css/main.css">
   <script>
     (function(){ const t=localStorage.getItem('theme'); if(t) document.documentElement.setAttribute('data-theme',t); })();
   </script>
 </head>
 <body class="auth-page">
 
-  <main class="auth-main">
+  <main class="auth-main" id="auth-main" hidden>
     <h1 class="auth-logo">Reading Log</h1>
 
     <div class="auth-tabs" role="tablist">
@@ -44,10 +44,17 @@
   </main>
 
   <script type="module">
-    import { signIn, signUp, onAuth } from '/js/firebase.js';
+    import { signIn, signUp, onAuth, ROOT } from '../js/firebase.js';
 
-    // Redirect already-authenticated users immediately
-    onAuth(user => { if (user) window.location.replace('/'); });
+    // Show form once we know the user isn't signed in; redirect if they are.
+    onAuth(user => {
+      if (user) {
+        window.location.replace(ROOT);
+      } else {
+        document.getElementById('auth-main').hidden = false;
+        document.getElementById('username').focus();
+      }
+    });
 
     // ── Tab switching ─────────────────────────────────────────────────────────
     let mode = 'signin';
@@ -90,7 +97,7 @@
         } else {
           await signUp(username, password);
         }
-        window.location.replace('/');
+        window.location.replace(ROOT);
       } catch (err) {
         errorEl.textContent   = friendlyError(err);
         errorEl.hidden        = false;

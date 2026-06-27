@@ -98,7 +98,7 @@
   <script src="../js/main.js"></script>
   <script>document.body.classList.add('auth-loading');</script>
   <script type="module">
-    import { requireAuth } from '/js/auth.js';
+    import { requireAuth } from '../js/auth.js';
     try {
       const { profile } = await requireAuth();
       if (profile) {

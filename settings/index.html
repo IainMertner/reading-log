@@ -167,8 +167,8 @@
   <script src="../js/main.js"></script>
   <script>document.body.classList.add('auth-loading');</script>
   <script type="module">
-    import { requireAuth } from '/js/auth.js';
-    import { logOut } from '/js/firebase.js';
+    import { requireAuth } from '../js/auth.js';
+    import { logOut, ROOT } from '../js/firebase.js';
 
     try {
       const { profile } = await requireAuth();
@@ -181,7 +181,7 @@
 
     document.getElementById('signout-btn').addEventListener('click', async () => {
       await logOut();
-      window.location.replace('/login/');
+      window.location.replace(ROOT + 'login/');
     });
   </script>
   <script>

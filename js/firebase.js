@@ -37,6 +37,9 @@ const app  = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db   = getFirestore(app);
 
+// Base URL of the app, works on any host (GitHub Pages, localhost, etc.)
+export const ROOT = new URL('..', import.meta.url).href;
+
 // Firebase Auth requires an email address internally.
 // We synthesise one from the username so the user never has to provide one.
 function toEmail(username) {

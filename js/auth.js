@@ -1,13 +1,13 @@
-import { onAuth, getProfile } from './firebase.js';
+import { onAuth, getProfile, ROOT } from './firebase.js';
 
 // Resolves with { user, profile } for authenticated users.
-// Redirects to /login/ for unauthenticated visitors.
+// Redirects to login/ for unauthenticated visitors.
 export function requireAuth() {
   return new Promise((resolve, reject) => {
     const off = onAuth(async user => {
       off();
       if (!user) {
-        window.location.replace('/login/');
+        window.location.replace(ROOT + 'login/');
         return;
       }
       try {

@@ -88,8 +88,8 @@
   <script src="../js/main.js"></script>
   <script>document.body.classList.add('auth-loading');</script>
   <script type="module">
-    import { requireAuth } from '/js/auth.js';
-    import { getFriends, addFriend } from '/js/firebase.js';
+    import { requireAuth } from '../js/auth.js';
+    import { getFriends, addFriend } from '../js/firebase.js';
 
     const { user } = await requireAuth();
     const list = document.getElementById('friends-list');
