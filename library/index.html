@@ -57,10 +57,10 @@
     </div>
 
     <p class="section-title" id="reading-title">Currently Reading</p>
-    <div id="reading-list"></div>
+    <div id="reading-list" class="books-grid"></div>
 
     <p class="section-title" id="finished-title" style="margin-top:1.5rem">Finished</p>
-    <div id="finished-list"></div>
+    <div id="finished-list" class="books-grid"></div>
 
   </main>
 
@@ -185,6 +185,16 @@
 
     const TRASH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
 
+    function cellRatingHtml(rating) {
+      let html = '';
+      for (let i = 1; i <= 5; i++) {
+        if (rating >= i)          html += '<span class="star-char full">★</span>';
+        else if (rating >= i-0.5) html += '<span class="star-char half">★</span>';
+        else                      html += '<span class="star-char">★</span>';
+      }
+      return html;
+    }
+
     function bookCoverHtml(book) {
       const inner = book.coverUrl
         ? `<img class="book-cover book-cover-img" src="${esc(book.coverUrl)}" alt="">`
@@ -198,7 +208,78 @@
         : `<div class="book-cover">📖</div>`;
     }
 
-    async function openCoverPicker(book, wrapEl) {
+    function makeBookCoverCell(book) {
+      const cell = document.createElement('div');
+      cell.className = 'library-cover-cell';
+      cell.dataset.id = book.id;
+      if (book.coverUrl) {
+        const img = document.createElement('img');
+        img.src = book.coverUrl; img.alt = '';
+        cell.appendChild(img);
+      } else {
+        const ph = document.createElement('div');
+        ph.className = 'library-cover-placeholder';
+        ph.textContent = '📖';
+        cell.appendChild(ph);
+      }
+      if (book.status === 'reading' && book.totalPages) {
+        const pct = Math.round((book.currentPage / book.totalPages) * 100);
+        const strip = document.createElement('div');
+        strip.className = 'library-progress-strip';
+        const fill = document.createElement('div');
+        fill.className = 'library-progress-fill';
+        fill.style.width = pct + '%';
+        strip.appendChild(fill);
+        cell.appendChild(strip);
+      }
+      const info = document.createElement('div');
+      info.className = 'library-cover-info';
+      if (book.rating) {
+        const badge = document.createElement('div');
+        badge.className = 'library-cover-rating';
+        badge.innerHTML = cellRatingHtml(book.rating);
+        info.appendChild(badge);
+      }
+      const titleEl = document.createElement('div');
+      titleEl.className = 'library-cover-title';
+      titleEl.textContent = book.title;
+      info.appendChild(titleEl);
+      cell.appendChild(info);
+      return cell;
+    }
+
+    function createBookModal(cardEl) {
+      const overlay = document.createElement('div');
+      overlay.className = 'book-modal-overlay';
+      const inner = document.createElement('div');
+      inner.className = 'book-modal-inner';
+      inner.appendChild(cardEl);
+      overlay.appendChild(inner);
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+      document.addEventListener('keydown', function onEsc(e) {
+        if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onEsc); }
+      });
+      document.body.appendChild(overlay);
+      return overlay;
+    }
+
+    function attachReadingCell(cell, book) {
+      cell.addEventListener('click', () => {
+        let overlay;
+        const card = renderReading(book, cell, () => overlay?.remove());
+        overlay = createBookModal(card);
+      });
+    }
+
+    function attachFinishedCell(cell, book) {
+      cell.addEventListener('click', () => {
+        let overlay;
+        const card = renderFinished(book, cell, () => overlay?.remove());
+        overlay = createBookModal(card);
+      });
+    }
+
+    async function openCoverPicker(book, wrapEl, coverCell) {
       const overlay = document.createElement('div');
       overlay.className = 'cover-picker-overlay';
       const modal = document.createElement('div');
@@ -277,6 +358,17 @@
           await updateBookCover(user.uid, book.id, url);
           book.coverUrl = url;
           wrapEl.innerHTML = coverInnerHtml(book);
+          // Sync the grid cell cover
+          if (coverCell) {
+            const existImg = coverCell.querySelector('img:not(.book-cover-img)');
+            const existPh  = coverCell.querySelector('.library-cover-placeholder');
+            if (existImg) { existImg.src = url; }
+            else {
+              const img = document.createElement('img');
+              img.src = url; img.alt = '';
+              existPh ? existPh.replaceWith(img) : coverCell.prepend(img);
+            }
+          }
           if (profile.shelf?.some(s => s.gbid === book.gbid && book.gbid)) {
             const updatedShelf = profile.shelf.map(s =>
               s.gbid === book.gbid ? { ...s, coverUrl: url } : s
@@ -496,7 +588,7 @@
       return el;
     }
 
-    function renderReading(book) {
+    function renderReading(book, coverCell, closeModal) {
       const pct  = book.totalPages ? Math.round((book.currentPage / book.totalPages) * 100) : 0;
       const card = document.createElement('div');
       card.className  = 'card';
@@ -524,7 +616,7 @@
         </div>
         <button class="btn-remove-x" aria-label="Remove" title="Remove">${TRASH_ICON}</button>
       </div>`;
-      card.querySelector('.book-cover-wrap').addEventListener('click', () => openCoverPicker(book, card.querySelector('.book-cover-wrap')));
+      card.querySelector('.book-cover-wrap').addEventListener('click', () => openCoverPicker(book, card.querySelector('.book-cover-wrap'), coverCell));
       card.querySelector('.book-started-date').replaceWith(makeDateEl('Started', book.addedAt, 'addedAt', book));
 
       const inputs    = card.querySelectorAll('.page-input');
@@ -542,9 +634,23 @@
         fillEl.style.width  = Math.round((clamped / total) * 100) + '%';
         labelEl.textContent = `Page ${clamped} of ${total}`;
         await updateBookProgress(user.uid, book.id, clamped);
-        book.currentPage    = clamped;
-        book.totalPages     = total;
+        book.currentPage = clamped;
+        book.totalPages  = total;
         updateBtn.style.display = 'none';
+        // Update progress strip on cover cell
+        if (coverCell && total) {
+          let strip = coverCell.querySelector('.library-progress-strip');
+          if (!strip) {
+            strip = document.createElement('div');
+            strip.className = 'library-progress-strip';
+            const fill = document.createElement('div');
+            fill.className = 'library-progress-fill';
+            strip.appendChild(fill);
+            const titleEl = coverCell.querySelector('.library-cover-title');
+            coverCell.insertBefore(strip, titleEl);
+          }
+          coverCell.querySelector('.library-progress-fill').style.width = Math.round((clamped / total) * 100) + '%';
+        }
       });
 
       card.querySelector('.btn-finished').addEventListener('click', () => {
@@ -572,28 +678,32 @@
         prompt.appendChild(actions);
 
         actions.querySelector('.btn-cancel-finish').addEventListener('click', () => {
-          card.replaceWith(renderReading(book));
+          card.replaceWith(renderReading(book, coverCell, closeModal));
         });
 
         actions.querySelector('.btn-do-finish').addEventListener('click', async () => {
           const rating = picker.getValue();
           const review = ta.value.trim() || null;
           await finishBook(user.uid, book.id, { title: book.title, author: book.author, gbid: book.gbid, rating, review }, profile.username);
-          card.remove();
-          if (!readingList.querySelector('.card')) showEmpty(readingList, 'reading-empty', 'Nothing in progress.');
           book.status     = 'finished';
           book.finishedAt = { toDate: () => new Date() };
           book.rating     = rating;
           book.review     = review;
+          coverCell.remove();
+          closeModal();
+          if (!readingList.querySelector('.library-cover-cell')) showEmpty(readingList, 'reading-empty', 'Nothing in progress.');
           document.getElementById('finished-empty')?.remove();
-          finishedList.prepend(renderFinished(book));
+          const newCell = makeBookCoverCell(book);
+          attachFinishedCell(newCell, book);
+          finishedList.prepend(newCell);
         });
       });
 
       card.querySelector('.btn-remove-x').addEventListener('click', async () => {
         await deleteBook(user.uid, book.id, { title: book.title });
-        card.remove();
-        if (!readingList.querySelector('.card')) {
+        coverCell.remove();
+        closeModal();
+        if (!readingList.querySelector('.library-cover-cell')) {
           showEmpty(readingList, 'reading-empty', 'Nothing in progress.');
         }
       });
@@ -601,31 +711,25 @@
       return card;
     }
 
-    function renderFinished(book) {
+    function renderFinished(book, coverCell, closeModal) {
       const card = document.createElement('div');
       card.className  = 'card';
       card.dataset.id = book.id;
       const titleHtml = book.gbid
         ? `<a class="book-title" href="../book/?gbid=${esc(book.gbid)}" style="text-decoration:none;color:inherit">${esc(book.title)}</a>`
         : `<span class="book-title">${esc(book.title)}</span>`;
-      const reviewHtml = book.review
-        ? `<div class="review-preview">${esc(book.review.slice(0, 100))}${book.review.length > 100 ? '…' : ''}</div>`
-        : '';
-
       card.innerHTML = `<div class="book-entry">
         ${bookCoverHtml(book)}
         <div class="book-info">
           ${titleHtml}
           ${book.author ? `<div class="book-author">${esc(book.author)}</div>` : ''}
           <div class="book-date-range"></div>
-          <div class="book-stars-wrap"></div>
-          ${reviewHtml}
-          <div class="rating-edit-form" style="display:none;margin-top:.75rem"></div>
+          <div class="book-rating-editor"></div>
         </div>
         <button class="btn-remove-x" aria-label="Remove" title="Remove">${TRASH_ICON}</button>
       </div>`;
 
-      card.querySelector('.book-cover-wrap').addEventListener('click', () => openCoverPicker(book, card.querySelector('.book-cover-wrap')));
+      card.querySelector('.book-cover-wrap').addEventListener('click', () => openCoverPicker(book, card.querySelector('.book-cover-wrap'), coverCell));
 
       const rangeEl = card.querySelector('.book-date-range');
       rangeEl.className = 'book-finished-meta book-date-range';
@@ -637,56 +741,55 @@
         makeDateEl(null, book.finishedAt, 'finishedAt', book)
       );
 
-      const starsWrap = card.querySelector('.book-stars-wrap');
-      starsWrap.className = 'book-stars-wrap stars-clickable';
-      starsWrap.innerHTML = book.rating
-        ? renderStars(book.rating)
-        : '<span class="stars-display">' + Array.from({length:5}, () => '<span class="star-char">★</span>').join('') + '</span>';
+      const ratingEditor = card.querySelector('.book-rating-editor');
+      const starPicker = createStarPicker(book.rating || 0);
+      ratingEditor.appendChild(starPicker);
 
-      starsWrap.addEventListener('click', () => {
-        const editForm = card.querySelector('.rating-edit-form');
-        if (editForm.style.display !== 'none') {
-          editForm.style.display = 'none';
-          starsWrap.style.display = '';
-          return;
+      const reviewTa = document.createElement('textarea');
+      reviewTa.className   = 'review-input';
+      reviewTa.placeholder = 'Write a review…';
+      reviewTa.rows = 3;
+      reviewTa.value = book.review || '';
+      ratingEditor.appendChild(reviewTa);
+
+      const saveRatingBtn = document.createElement('button');
+      saveRatingBtn.type = 'button'; saveRatingBtn.className = 'join-club-btn';
+      saveRatingBtn.style.cssText = 'margin-top:.5rem;width:100%';
+      saveRatingBtn.textContent = 'Save';
+      ratingEditor.appendChild(saveRatingBtn);
+
+      saveRatingBtn.addEventListener('click', async () => {
+        saveRatingBtn.disabled = true;
+        const rating = starPicker.getValue();
+        const review = reviewTa.value.trim() || null;
+        await updateBookRating(user.uid, book.id, { rating, review });
+        book.rating = rating;
+        book.review = review;
+        // Sync rating badge on the grid cell
+        if (coverCell) {
+          let badge = coverCell.querySelector('.library-cover-rating');
+          if (rating) {
+            const html = cellRatingHtml(rating);
+            if (badge) { badge.innerHTML = html; }
+            else {
+              badge = document.createElement('div');
+              badge.className = 'library-cover-rating';
+              badge.innerHTML = html;
+              const info = coverCell.querySelector('.library-cover-info');
+              info.insertBefore(badge, info.firstChild);
+            }
+          } else if (badge) {
+            badge.remove();
+          }
         }
-        starsWrap.style.display = 'none';
-
-        editForm.innerHTML = '';
-        const picker = createStarPicker(book.rating || 0);
-        editForm.appendChild(picker);
-
-        const ta = document.createElement('textarea');
-        ta.className   = 'review-input';
-        ta.placeholder = 'Write a review…';
-        ta.rows = 3;
-        ta.value = book.review || '';
-        editForm.appendChild(ta);
-
-        const actions = document.createElement('div');
-        actions.style.cssText = 'display:flex;gap:.5rem;margin-top:.5rem';
-        actions.innerHTML = `<button class="join-club-btn btn-save-rating" type="button">Save</button><button class="btn-update btn-cancel-rating" type="button">Cancel</button>`;
-        editForm.appendChild(actions);
-        editForm.style.display = 'block';
-
-        actions.querySelector('.btn-save-rating').addEventListener('click', async () => {
-          const rating = picker.getValue();
-          const review = ta.value.trim() || null;
-          await updateBookRating(user.uid, book.id, { rating, review });
-          book.rating = rating;
-          book.review = review;
-          card.replaceWith(renderFinished(book));
-        });
-        actions.querySelector('.btn-cancel-rating').addEventListener('click', () => {
-          editForm.style.display = 'none';
-          starsWrap.style.display = '';
-        });
+        closeModal();
       });
 
       card.querySelector('.btn-remove-x').addEventListener('click', async () => {
         await deleteBook(user.uid, book.id, { title: book.title });
-        card.remove();
-        if (!finishedList.querySelector('.card')) {
+        coverCell.remove();
+        closeModal();
+        if (!finishedList.querySelector('.library-cover-cell')) {
           showEmpty(finishedList, 'finished-empty', 'No finished books yet.');
         }
       });
@@ -769,10 +872,18 @@
         setTitles(reading, finished);
 
         if (reading.length === 0) showEmpty(readingList, 'reading-empty', 'Nothing in progress.');
-        else reading.forEach(b => readingList.appendChild(renderReading(b)));
+        else reading.forEach(b => {
+          const cell = makeBookCoverCell(b);
+          attachReadingCell(cell, b);
+          readingList.appendChild(cell);
+        });
 
         if (finished.length === 0) showEmpty(finishedList, 'finished-empty', 'No finished books yet.');
-        else finished.forEach(b => finishedList.appendChild(renderFinished(b)));
+        else finished.forEach(b => {
+          const cell = makeBookCoverCell(b);
+          attachFinishedCell(cell, b);
+          finishedList.appendChild(cell);
+        });
       } else {
         document.getElementById('add-book-card').style.display = 'none';
         const backLink = document.getElementById('back-link');
@@ -787,10 +898,18 @@
           setTitles(reading, finished);
 
           if (reading.length === 0) showEmpty(readingList, 'reading-empty', 'Nothing in progress.');
-          else reading.forEach(b => readingList.appendChild(renderReadingView(b)));
+          else reading.forEach(b => {
+            const cell = makeBookCoverCell(b);
+            cell.addEventListener('click', () => createBookModal(renderReadingView(b)));
+            readingList.appendChild(cell);
+          });
 
           if (finished.length === 0) showEmpty(finishedList, 'finished-empty', 'No finished books yet.');
-          else finished.forEach(b => finishedList.appendChild(renderFinishedView(b)));
+          else finished.forEach(b => {
+            const cell = makeBookCoverCell(b);
+            cell.addEventListener('click', () => createBookModal(renderFinishedView(b)));
+            finishedList.appendChild(cell);
+          });
         }
       }
     } finally {
@@ -926,7 +1045,9 @@
       const book = { id, title, author, totalPages: pages, currentPage: 0, status: 'reading', gbid, coverUrl: cover, addedAt: { toDate: () => new Date() } };
 
       document.getElementById('reading-empty')?.remove();
-      readingList.prepend(renderReading(book));
+      const newCell = makeBookCoverCell(book);
+      attachReadingCell(newCell, book);
+      readingList.prepend(newCell);
 
       saveBtn.disabled    = false;
       saveBtn.textContent = 'Start reading';
@@ -1000,7 +1121,9 @@
           gbid, rating, review
         };
         document.getElementById('finished-empty')?.remove();
-        finishedList.prepend(renderFinished(book));
+        const newCell = makeBookCoverCell(book);
+        attachFinishedCell(newCell, book);
+        finishedList.prepend(newCell);
         closeForm();
       });
     });

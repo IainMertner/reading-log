@@ -819,6 +819,27 @@ a { color: inherit; }
 .cover-picker-upload-inner { font-size: 2rem; line-height: 1; color: var(--text-muted); pointer-events: none; }
 .cover-picker-upload:hover .cover-picker-upload-inner { color: var(--accent); }
 
+/* Library cover grid */
+.books-grid { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .625rem; }
+.library-cover-cell { width: calc(25% - .375rem); position: relative; cursor: pointer; flex-shrink: 0; border-radius: var(--radius-sm); overflow: hidden; }
+.library-cover-cell img { width: 100%; aspect-ratio: 2/3; display: block; object-fit: cover; }
+.library-cover-placeholder { width: 100%; aspect-ratio: 2/3; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; background: var(--bg-card); }
+.library-cover-cell::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,0); transition: background .15s; border-radius: var(--radius-sm); pointer-events: none; }
+.library-cover-cell:hover::after { background: rgba(0,0,0,.18); }
+.library-progress-strip { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(0,0,0,.25); z-index: 2; }
+.library-progress-fill { height: 100%; background: var(--accent); }
+.library-cover-info { position: absolute; bottom: 0; left: 0; right: 0; padding: .75rem .35rem .3rem; background: linear-gradient(transparent, rgba(0,0,0,.72)); pointer-events: none; z-index: 1; }
+.library-cover-rating { display: block; margin-bottom: .15rem; }
+.library-cover-title { font-size: .68rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
+.library-cover-rating .star-char { color: transparent; }
+.library-cover-rating .star-char.full { color: #fff; }
+.library-cover-rating .star-char.half { background: linear-gradient(90deg, #fff 50%, transparent 50%); -webkit-background-clip: text; background-clip: text; }
+
+/* Book detail modal */
+.book-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 500; display: flex; align-items: flex-start; justify-content: center; padding: 1.5rem 1rem; overflow-y: auto; }
+.book-modal-inner { max-width: 480px; width: 100%; }
+.book-modal-inner .card { margin: 0; }
+
 /* Edit shelf */
 .shelf-edit-list { display: flex; flex-wrap: wrap; gap: .625rem; margin-bottom: .75rem; min-height: 0; }
 .shelf-edit-item { position: relative; }
