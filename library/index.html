@@ -199,7 +199,7 @@
     }
 
     function formatDateTs(ts, precision) {
-      if (!ts?.toDate) return 'Unknown';
+      if (!ts?.toDate || !precision) return 'Unknown';
       const d = ts.toDate();
       if (precision === 'year') return String(d.getFullYear());
       if (precision === 'day')  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -536,9 +536,10 @@
 
     function renderFinishedView(book) {
       const fmt = (ts, prec) => {
-        if (!ts?.toDate) return null;
+        if (!ts?.toDate || !prec) return null;
         const d = ts.toDate();
         if (prec === 'year') return String(d.getFullYear());
+        if (prec === 'day')  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
         return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
       };
       const whenStarted  = fmt(book.addedAt, book.addedAtPrecision);

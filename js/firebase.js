@@ -167,6 +167,17 @@ export function updateAvatarBorderColor(uid, color) {
   return updateDoc(doc(db, 'users', uid), { avatarBorderColor: color || deleteField() });
 }
 
+export async function importBooks(uid, books) {
+  const col = collection(db, 'users', uid, 'books');
+  for (let i = 0; i < books.length; i += 20) {
+    await Promise.all(books.slice(i, i + 20).map(b => {
+      const data = { ...b };
+      if (!data.addedAt) data.addedAt = serverTimestamp();
+      return addDoc(col, data);
+    }));
+  }
+}
+
 export function muteUser(currentUid, targetUid) {
   return updateDoc(doc(db, 'users', currentUid), { muted: arrayUnion(targetUid) });
 }

@@ -62,6 +62,26 @@
     </div>
 
     <div class="settings-group">
+      <div class="settings-group-label">Import</div>
+      <div class="settings-list">
+        <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:.625rem;padding:.875rem 1rem">
+          <span class="settings-row-label">Goodreads</span>
+          <p style="font-size:.82rem;color:var(--text-muted);margin:0">My Books → Import and Export</p>
+          <input type="file" id="gr-file" accept=".csv" style="display:none">
+          <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+            <button class="btn-update" id="gr-select-btn" type="button">Choose CSV…</button>
+            <span id="gr-filename" style="font-size:.82rem;color:var(--text-muted)"></span>
+          </div>
+          <div id="gr-preview" style="display:none;width:100%">
+            <div id="gr-preview-text" style="font-size:.85rem;color:var(--text-muted);margin-bottom:.5rem"></div>
+            <button id="gr-import-btn" class="join-club-btn" type="button">Import</button>
+          </div>
+          <div id="gr-status" style="display:none;font-size:.85rem"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-group">
       <div class="settings-group-label">Danger zone</div>
       <div class="settings-list">
         <div class="settings-row">
@@ -116,10 +136,13 @@
   <script>document.body.classList.add('auth-loading');</script>
   <script type="module">
     import { requireAuth } from '../js/auth.js';
-    import { logOut, ROOT } from '../js/firebase.js';
+    import { logOut, ROOT, importBooks } from '../js/firebase.js';
+
+    let currentUser = null;
 
     try {
-      const { profile } = await requireAuth();
+      const { user, profile } = await requireAuth();
+      currentUser = user;
       if (profile) document.getElementById('settings-username').textContent = profile.username;
     } finally {
       document.body.classList.remove('auth-loading');
@@ -129,6 +152,152 @@
       await logOut();
       window.location.replace(ROOT + 'login/');
     });
+
+    // ── Goodreads import ──────────────────────────────────────────────────────
+    const grFile      = document.getElementById('gr-file');
+    const grSelectBtn = document.getElementById('gr-select-btn');
+    const grFilename  = document.getElementById('gr-filename');
+    const grPreview   = document.getElementById('gr-preview');
+    const grPreviewText = document.getElementById('gr-preview-text');
+    const grImportBtn = document.getElementById('gr-import-btn');
+    const grStatus    = document.getElementById('gr-status');
+    let parsedBooks   = [];
+
+    grSelectBtn.addEventListener('click', () => grFile.click());
+
+    grFile.addEventListener('change', () => {
+      const file = grFile.files[0];
+      if (!file) return;
+      grFilename.textContent = file.name;
+      grStatus.style.display = 'none';
+      const reader = new FileReader();
+      reader.onload = e => {
+        parsedBooks = parseGoodreads(e.target.result);
+        const finished = parsedBooks.filter(b => b.status === 'finished').length;
+        const reading  = parsedBooks.filter(b => b.status === 'reading').length;
+        grPreviewText.textContent = `Found ${parsedBooks.length} book${parsedBooks.length !== 1 ? 's' : ''}: ${finished} finished, ${reading} currently reading.`;
+        grPreview.style.display = '';
+        grImportBtn.disabled = false;
+      };
+      reader.readAsText(file);
+    });
+
+    grImportBtn.addEventListener('click', async () => {
+      if (!parsedBooks.length || !currentUser) return;
+      grImportBtn.disabled = true;
+      grStatus.style.display = '';
+      grStatus.style.color = 'var(--text-muted)';
+      grStatus.textContent = `Importing ${parsedBooks.length} books…`;
+      try {
+        await importBooks(currentUser.uid, parsedBooks);
+        grStatus.textContent = `Imported ${parsedBooks.length} books successfully.`;
+        grStatus.style.color = 'var(--accent)';
+        grPreview.style.display = 'none';
+        parsedBooks = [];
+        grFile.value = '';
+        grFilename.textContent = '';
+      } catch (err) {
+        console.error(err);
+        grStatus.textContent = 'Import failed. Please try again.';
+        grStatus.style.color = 'var(--danger, #d44)';
+        grImportBtn.disabled = false;
+      }
+    });
+
+    function parseCSV(text) {
+      // Strip UTF-8 BOM if present (common in Goodreads exports)
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const rows = [];
+      let i = 0;
+      const n = text.length;
+      while (i < n) {
+        const row = [];
+        while (true) {
+          if (i < n && text[i] === '"') {
+            i++;
+            let field = '';
+            while (i < n) {
+              if (text[i] === '"') {
+                if (i + 1 < n && text[i + 1] === '"') { field += '"'; i += 2; }
+                else { i++; break; }
+              } else { field += text[i++]; }
+            }
+            row.push(field.trim());
+          } else {
+            let field = '';
+            while (i < n && text[i] !== ',' && text[i] !== '\n' && text[i] !== '\r') field += text[i++];
+            row.push(field.trim());
+          }
+          if (i >= n || text[i] === '\n' || text[i] === '\r') {
+            while (i < n && (text[i] === '\r' || text[i] === '\n')) i++;
+            break;
+          }
+          i++; // skip comma
+        }
+        if (row.some(f => f)) rows.push(row);
+      }
+      return rows;
+    }
+
+    function parseGRDate(str) {
+      if (!str?.trim()) return null;
+      const parts = str.trim().split('/');
+      if (parts.length === 3) return new Date(+parts[0], +parts[1] - 1, +parts[2]);
+      return null;
+    }
+
+    function parseGoodreads(text) {
+      const rows = parseCSV(text);
+      if (rows.length < 2) return [];
+      const headers = rows[0];
+      const idx = h => headers.indexOf(h);
+      const col = {
+        title:     idx('Title'),
+        author:    idx('Author'),
+        pages:     idx('Number of Pages'),
+        rating:    idx('My Rating'),
+        shelf:     idx('Exclusive Shelf'),
+        dateRead:  idx('Date Read'),
+        dateAdded: idx('Date Added'),
+        review:    idx('My Review'),
+      };
+
+      const books = [];
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (r.length < 3) continue;
+        const shelf = r[col.shelf] || '';
+        if (shelf === 'to-read') continue;
+
+        const status     = shelf === 'currently-reading' ? 'reading' : 'finished';
+        const totalPages = parseInt(r[col.pages]) || 0;
+        const ratingRaw  = parseInt(r[col.rating]) || 0;
+        const rating     = ratingRaw > 0 ? ratingRaw : null;
+        const finishedAt = parseGRDate(r[col.dateRead]);
+        const addedAt    = parseGRDate(r[col.dateAdded]) || finishedAt || null;
+        const review     = (r[col.review] || '').trim();
+        const title      = (r[col.title] || '').trim();
+        if (!title) continue;
+
+        const book = {
+          title,
+          author:      (r[col.author] || '').trim(),
+          totalPages,
+          currentPage: status === 'finished' ? totalPages : 0,
+          status,
+          gbid:        '',
+        };
+        if (addedAt) { book.addedAt = addedAt; book.addedAtPrecision = 'day'; }
+        if (rating != null) book.rating = rating;
+        if (review)         book.review = review;
+        if (status === 'finished' && finishedAt) {
+          book.finishedAt          = finishedAt;
+          book.finishedAtPrecision = 'day';
+        }
+        books.push(book);
+      }
+      return books;
+    }
   </script>
   <script>
     // Sync theme select with current stored value
