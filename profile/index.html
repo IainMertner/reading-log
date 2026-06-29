@@ -39,9 +39,11 @@
         <div class="profile-avatar-lg" id="profile-avatar"></div>
       </div>
       <div class="profile-name-wrap">
-        <div class="profile-name" id="profile-name"></div>
-        <div id="own-actions" style="display:none;margin-top:.45rem">
-          <a href="../edit-profile/" class="profile-action-btn profile-action-mute" style="text-decoration:none">Edit profile</a>
+        <div class="profile-name-row">
+          <div class="profile-name" id="profile-name"></div>
+          <div id="own-actions" style="display:none">
+            <a href="../edit-profile/" class="profile-action-btn profile-action-mute" style="text-decoration:none">Edit profile</a>
+          </div>
         </div>
         <div class="profile-actions" id="profile-actions" hidden>
           <button id="follow-btn" class="profile-action-btn profile-action-follow">Follow</button>
@@ -50,7 +52,7 @@
       </div>
     </div>
 
-    <div id="shelf-card" class="card" style="display:none;margin-bottom:.625rem">
+    <div id="shelf-card" style="display:none;margin-top:.75rem;margin-bottom:.625rem">
       <div class="shelf-label" id="shelf-label">Shelf</div>
       <div class="shelf-covers" id="shelf-covers"></div>
     </div>
@@ -159,6 +161,7 @@
         const avatarEl = document.getElementById('profile-avatar');
         if (myProfile.avatarUrl) { avatarEl.innerHTML  = `<img src="${myProfile.avatarUrl}" alt="">`; }
         else                     { avatarEl.textContent = myProfile.username[0].toUpperCase(); }
+        if (myProfile.avatarBorderColor) avatarEl.style.borderColor = myProfile.avatarBorderColor;
 
         renderShelf(myProfile.shelf, myProfile.username);
         document.getElementById('own-actions').style.display  = '';
@@ -190,6 +193,7 @@
           } else {
             avatarEl.textContent = target.username[0].toUpperCase();
           }
+          if (target.avatarBorderColor) avatarEl.style.borderColor = target.avatarBorderColor;
           renderShelf(target.shelf, target.username);
           document.getElementById('profile-name').textContent = target.username;
 

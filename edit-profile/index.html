@@ -34,7 +34,7 @@
 
 
     <div class="card" style="margin-bottom:.625rem">
-      <div class="edit-field-label" style="margin-bottom:.6rem">Profile photo</div>
+      <div class="edit-field-label" style="margin-bottom:.6rem">Profile picture</div>
       <div class="edit-photo-row">
         <div class="avatar-upload-wrap" id="avatar-wrap">
           <div class="profile-avatar-lg" id="avatar-preview"></div>
@@ -43,11 +43,20 @@
           <button class="profile-avatar-change" id="change-photo-btn" type="button">Change photo</button>
         </div>
       </div>
+      <div class="edit-field-label" style="margin-top:.875rem;margin-bottom:.35rem">Border colour</div>
+      <div class="border-color-picker" id="border-color-picker">
+        <button class="border-color-swatch" data-color="" style="background:var(--border)" title="Default"></button>
+        <button class="border-color-swatch" data-color="#c9a050" style="background:#c9a050" title="Gold"></button>
+        <button class="border-color-swatch" data-color="#5b8fcc" style="background:#5b8fcc" title="Blue"></button>
+        <button class="border-color-swatch" data-color="#d45f7a" style="background:#d45f7a" title="Rose"></button>
+        <button class="border-color-swatch" data-color="#3dab8b" style="background:#3dab8b" title="Teal"></button>
+        <button class="border-color-swatch" data-color="#9b6dd6" style="background:#9b6dd6" title="Purple"></button>
+      </div>
       <input type="file" id="avatar-file" accept="image/*" style="display:none">
     </div>
 
     <div class="card" style="margin-bottom:.625rem">
-      <div class="edit-field-label" style="margin-bottom:.6rem">Shelf <span style="font-weight:400;color:var(--text-muted);font-size:.78rem">— up to 4 books</span></div>
+      <div class="edit-field-label" style="margin-bottom:.6rem">Shelf <span style="font-weight:400;color:var(--text-muted);font-size:.78rem">- choose up to 4 books to display on your profile</span></div>
       <div id="shelf-edit-list" class="shelf-edit-list"></div>
       <div id="shelf-add-section">
         <div class="book-search-wrap">
@@ -108,7 +117,7 @@
   <script>document.body.classList.add('auth-loading');</script>
   <script type="module">
     import { requireAuth } from '../js/auth.js';
-    import { getBooks, updateAvatarUrl, updateShelf } from '../js/firebase.js';
+    import { getBooks, updateAvatarUrl, updateShelf, updateAvatarBorderColor } from '../js/firebase.js';
 
     const { user, profile } = await requireAuth();
     const libraryBooks = (await getBooks(user.uid)).filter(b => b.coverUrl);
@@ -119,12 +128,26 @@
     const changePhotoBtn = document.getElementById('change-photo-btn');
     const fileInput      = document.getElementById('avatar-file');
     let pendingAvatarUrl = null;
+    let selectedBorderColor = profile.avatarBorderColor || '';
+
+    // ── Border colour swatches ────────────────────────────────────────────────
+    const swatches = document.querySelectorAll('.border-color-swatch');
+    function updateSwatchSelection() {
+      swatches.forEach(s => s.classList.toggle('selected', s.dataset.color === selectedBorderColor));
+    }
+    swatches.forEach(s => s.addEventListener('click', () => {
+      selectedBorderColor = s.dataset.color;
+      updateSwatchSelection();
+      document.getElementById('avatar-preview').style.borderColor = selectedBorderColor || '';
+    }));
+    updateSwatchSelection();
 
     function showAvatar(url) {
       if (url) { avatarPreview.innerHTML  = `<img src="${url}" alt="">`; }
       else     { avatarPreview.textContent = profile.username[0].toUpperCase(); }
     }
     showAvatar(profile.avatarUrl);
+    if (selectedBorderColor) document.getElementById('avatar-preview').style.borderColor = selectedBorderColor;
 
     avatarWrap.addEventListener('click',     () => fileInput.click());
     changePhotoBtn.addEventListener('click', () => fileInput.click());
@@ -250,11 +273,13 @@
         const saves = [];
         if (pendingAvatarUrl) saves.push(updateAvatarUrl(user.uid, pendingAvatarUrl));
         saves.push(updateShelf(user.uid, shelfItems));
+        saves.push(updateAvatarBorderColor(user.uid, selectedBorderColor));
         await Promise.all(saves);
 
         const cached = JSON.parse(localStorage.getItem('rl_profile') || '{}');
         if (pendingAvatarUrl) cached.avatarUrl = pendingAvatarUrl;
         cached.shelf = shelfItems;
+        cached.avatarBorderColor = selectedBorderColor;
         localStorage.setItem('rl_profile', JSON.stringify(cached));
 
         location.replace('../profile/');

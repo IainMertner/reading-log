@@ -163,6 +163,10 @@ export function updateShelf(uid, items) {
   return updateDoc(doc(db, 'users', uid), { shelf: items });
 }
 
+export function updateAvatarBorderColor(uid, color) {
+  return updateDoc(doc(db, 'users', uid), { avatarBorderColor: color || deleteField() });
+}
+
 export function muteUser(currentUid, targetUid) {
   return updateDoc(doc(db, 'users', currentUid), { muted: arrayUnion(targetUid) });
 }

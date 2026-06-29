@@ -765,6 +765,7 @@ a { color: inherit; }
   width: 72px;
   height: 72px;
   border-radius: 50%;
+  border: 3px solid var(--border);
   background: var(--accent-dim);
   color: var(--accent);
   display: flex;
@@ -780,6 +781,10 @@ a { color: inherit; }
 .avatar-upload-wrap { cursor: pointer; }
 .avatar-upload-wrap .profile-avatar-lg { transition: filter .18s; }
 .avatar-upload-wrap:hover .profile-avatar-lg { filter: brightness(0.72); }
+.border-color-picker { display: flex; gap: .5rem; margin-top: .875rem; flex-wrap: wrap; }
+.border-color-swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; outline: none; transition: transform .12s; }
+.border-color-swatch:hover { transform: scale(1.15); }
+.border-color-swatch.selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
 
 .profile-avatar-change {
   font-size: 0.7rem;
@@ -795,9 +800,9 @@ a { color: inherit; }
 
 /* Profile shelf */
 .shelf-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: .5rem; }
-.shelf-covers { display: flex; justify-content: center; gap: .625rem; padding: 0 .5rem; }
+.shelf-covers { display: flex; justify-content: center; gap: .625rem; padding: 0 .25rem; }
 .shelf-covers a { display: block; width: calc((100% - 3 * .625rem) / 4); flex-shrink: 0; }
-.shelf-cover { width: 100%; aspect-ratio: 2/3; border-radius: var(--radius-sm); object-fit: cover; display: block; }
+.shelf-cover { width: 100%; aspect-ratio: 2/3; border-radius: var(--radius-sm); object-fit: cover; display: block; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
 
 /* Edit shelf */
 .shelf-edit-list { display: flex; flex-wrap: wrap; gap: .625rem; margin-bottom: .75rem; min-height: 0; }
@@ -814,6 +819,7 @@ a { color: inherit; }
 .shelf-edit-title { font-size: .65rem; color: var(--text-muted); margin-top: .25rem; width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .profile-name-wrap { flex: 1; min-width: 0; }
+.profile-name-row { display: flex; align-items: center; gap: .75rem; }
 .profile-name-wrap .profile-name { font-size: 1.25rem; font-weight: 700; }
 
 .profile-actions { display: none; gap: .4rem; margin-top: .45rem; }
