@@ -793,6 +793,26 @@ a { color: inherit; }
 .edit-photo-row { display: flex; align-items: center; gap: .875rem; }
 .edit-field-label { font-size: .85rem; font-weight: 600; margin-bottom: .25rem; }
 
+/* Profile shelf */
+.shelf-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: .5rem; }
+.shelf-covers { display: flex; justify-content: center; gap: .625rem; padding: 0 .5rem; }
+.shelf-covers a { display: block; width: calc((100% - 3 * .625rem) / 4); flex-shrink: 0; }
+.shelf-cover { width: 100%; aspect-ratio: 2/3; border-radius: var(--radius-sm); object-fit: cover; display: block; }
+
+/* Edit shelf */
+.shelf-edit-list { display: flex; flex-wrap: wrap; gap: .625rem; margin-bottom: .75rem; min-height: 0; }
+.shelf-edit-item { position: relative; }
+.shelf-edit-cover { width: 64px; height: 96px; border-radius: var(--radius-sm); object-fit: cover; display: block; background: var(--bg-alt); }
+.shelf-edit-remove {
+  position: absolute; top: -7px; right: -7px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--text-muted); color: var(--bg);
+  border: none; cursor: pointer; font-size: .7rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.shelf-edit-remove:hover { background: #ef4444; }
+.shelf-edit-title { font-size: .65rem; color: var(--text-muted); margin-top: .25rem; width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .profile-name-wrap { flex: 1; min-width: 0; }
 .profile-name-wrap .profile-name { font-size: 1.25rem; font-weight: 700; }
 

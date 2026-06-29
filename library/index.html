@@ -32,7 +32,7 @@
 
   <main class="page-content">
     <a class="back-link" id="back-link" href="../" style="display:none">← Back</a>
-    <h1 class="page-title" id="page-title">Library</h1>
+
 
     <div class="add-book-card card" id="add-book-card">
       <button class="add-book-toggle" id="add-book-toggle">
@@ -602,9 +602,8 @@
 
         const target = await getProfileByUsername(viewUser);
         if (!target) {
-          document.getElementById('page-title').textContent = 'User not found';
+          // user not found
         } else {
-          document.getElementById('page-title').textContent = `${target.username}'s Library`;
           const { reading, finished } = sortBooks(await getBooks(target.uid));
           setTitles(reading, finished);
 

@@ -31,7 +31,7 @@
   </header>
 
   <main class="page-content">
-    <h1 class="page-title">Edit Profile</h1>
+
 
     <div class="card" style="margin-bottom:.625rem">
       <div class="edit-field-label" style="margin-bottom:.6rem">Profile photo</div>
@@ -46,7 +46,20 @@
       <input type="file" id="avatar-file" accept="image/*" style="display:none">
     </div>
 
-    <div style="display:flex;gap:.5rem;margin-top:.25rem">
+    <div class="card" style="margin-bottom:.625rem">
+      <div class="edit-field-label" style="margin-bottom:.6rem">Shelf <span style="font-weight:400;color:var(--text-muted);font-size:.78rem">— up to 4 books</span></div>
+      <div id="shelf-edit-list" class="shelf-edit-list"></div>
+      <div id="shelf-add-section">
+        <div class="book-search-wrap">
+          <input type="text" id="shelf-search" class="join-club-input"
+            placeholder="Search for a book to add…" autocomplete="off" spellcheck="false"
+            style="width:100%;box-sizing:border-box">
+          <div id="shelf-suggestions" class="book-suggestions" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:.5rem">
       <button id="save-btn" class="join-club-btn" style="flex:1">Save</button>
       <button id="cancel-btn" class="btn-update" style="flex:1">Cancel</button>
     </div>
@@ -95,18 +108,17 @@
   <script>document.body.classList.add('auth-loading');</script>
   <script type="module">
     import { requireAuth } from '../js/auth.js';
-    import { updateAvatarUrl } from '../js/firebase.js';
+    import { getBooks, updateAvatarUrl, updateShelf } from '../js/firebase.js';
 
     const { user, profile } = await requireAuth();
+    const libraryBooks = (await getBooks(user.uid)).filter(b => b.coverUrl);
 
+    // ── Avatar ────────────────────────────────────────────────────────────────
     const avatarPreview  = document.getElementById('avatar-preview');
     const avatarWrap     = document.getElementById('avatar-wrap');
     const changePhotoBtn = document.getElementById('change-photo-btn');
     const fileInput      = document.getElementById('avatar-file');
-    const saveBtn        = document.getElementById('save-btn');
-    const cancelBtn      = document.getElementById('cancel-btn');
-
-    let pendingDataUrl = null;
+    let pendingAvatarUrl = null;
 
     function showAvatar(url) {
       if (url) { avatarPreview.innerHTML  = `<img src="${url}" alt="">`; }
@@ -141,8 +153,8 @@
       const file = fileInput.files[0];
       if (!file) return;
       try {
-        pendingDataUrl = await resizeToDataUrl(file);
-        showAvatar(pendingDataUrl);
+        pendingAvatarUrl = await resizeToDataUrl(file);
+        showAvatar(pendingAvatarUrl);
       } catch (e) {
         console.error(e);
         alert('Could not load that image.');
@@ -151,15 +163,100 @@
       }
     });
 
+    // ── Shelf ─────────────────────────────────────────────────────────────────
+    let shelfItems = (profile.shelf || []).map(i => ({ ...i }));
+
+    const shelfList       = document.getElementById('shelf-edit-list');
+    const shelfAddSection = document.getElementById('shelf-add-section');
+    const shelfSearch     = document.getElementById('shelf-search');
+    const shelfSuggestions = document.getElementById('shelf-suggestions');
+
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function renderShelfEdit() {
+      shelfList.innerHTML = '';
+      shelfItems.forEach((item, i) => {
+        const div = document.createElement('div');
+        div.className = 'shelf-edit-item';
+        const img = document.createElement('img');
+        img.src = item.coverUrl || ''; img.alt = item.title || '';
+        img.className = 'shelf-edit-cover';
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'shelf-edit-remove';
+        btn.textContent = '×'; btn.title = 'Remove';
+        btn.addEventListener('click', () => { shelfItems.splice(i, 1); renderShelfEdit(); });
+        const title = document.createElement('div');
+        title.className = 'shelf-edit-title'; title.textContent = item.title || '';
+        div.append(img, btn, title);
+        shelfList.appendChild(div);
+      });
+      shelfAddSection.style.display = shelfItems.length >= 4 ? 'none' : '';
+      if (shelfItems.length >= 4) {
+        shelfSearch.value = '';
+        shelfSuggestions.style.display = 'none';
+      }
+    }
+    renderShelfEdit();
+
+    // Search — filter from own library (books already have covers)
+    shelfSearch.addEventListener('input', () => {
+      const q = shelfSearch.value.trim().toLowerCase();
+      if (!q) { shelfSuggestions.style.display = 'none'; return; }
+      const alreadyIn = new Set(shelfItems.map(i => i.gbid));
+      const matches = libraryBooks
+        .filter(b => !alreadyIn.has(b.gbid) &&
+          (b.title.toLowerCase().includes(q) || (b.author || '').toLowerCase().includes(q)))
+        .slice(0, 8);
+      renderSuggestions(matches);
+    });
+
+    function renderSuggestions(books) {
+      shelfSuggestions.innerHTML = '';
+      if (!books.length) { shelfSuggestions.style.display = 'none'; return; }
+      books.forEach(book => {
+        const item = document.createElement('div');
+        item.className = 'book-suggestion-item';
+        item.innerHTML = `<div class="suggestion-inner">
+          <img class="suggestion-cover" src="${esc(book.coverUrl)}" alt="">
+          <div><div class="suggestion-title">${esc(book.title)}</div>
+          <div class="suggestion-meta">${esc(book.author || '')}</div></div>
+        </div>`;
+        item.addEventListener('click', () => {
+          shelfItems.push({ gbid: book.gbid, title: book.title, coverUrl: book.coverUrl });
+          shelfSearch.value = '';
+          shelfSuggestions.style.display = 'none';
+          renderShelfEdit();
+        });
+        shelfSuggestions.appendChild(item);
+      });
+      shelfSuggestions.style.display = '';
+    }
+
+    document.addEventListener('click', e => {
+      if (!shelfSuggestions.contains(e.target) && e.target !== shelfSearch) {
+        shelfSuggestions.style.display = 'none';
+      }
+    });
+
+    // ── Save / Cancel ─────────────────────────────────────────────────────────
+    const saveBtn   = document.getElementById('save-btn');
+    const cancelBtn = document.getElementById('cancel-btn');
+
     saveBtn.addEventListener('click', async () => {
       saveBtn.disabled = true;
       try {
-        if (pendingDataUrl) {
-          await updateAvatarUrl(user.uid, pendingDataUrl);
-          const cached = JSON.parse(localStorage.getItem('rl_profile') || '{}');
-          cached.avatarUrl = pendingDataUrl;
-          localStorage.setItem('rl_profile', JSON.stringify(cached));
-        }
+        const saves = [];
+        if (pendingAvatarUrl) saves.push(updateAvatarUrl(user.uid, pendingAvatarUrl));
+        saves.push(updateShelf(user.uid, shelfItems));
+        await Promise.all(saves);
+
+        const cached = JSON.parse(localStorage.getItem('rl_profile') || '{}');
+        if (pendingAvatarUrl) cached.avatarUrl = pendingAvatarUrl;
+        cached.shelf = shelfItems;
+        localStorage.setItem('rl_profile', JSON.stringify(cached));
+
         location.replace('../profile/');
       } catch (e) {
         console.error(e);

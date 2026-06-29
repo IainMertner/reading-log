@@ -159,6 +159,10 @@ export function updateAvatarUrl(uid, dataUrl) {
   return updateDoc(doc(db, 'users', uid), { avatarUrl: dataUrl });
 }
 
+export function updateShelf(uid, items) {
+  return updateDoc(doc(db, 'users', uid), { shelf: items });
+}
+
 export function muteUser(currentUid, targetUid) {
   return updateDoc(doc(db, 'users', currentUid), { muted: arrayUnion(targetUid) });
 }

@@ -32,7 +32,7 @@
 
   <main class="page-content">
     <a class="back-link" id="back-link" href="#" style="display:none">← Back</a>
-    <h1 class="page-title">Profile</h1>
+
 
     <div class="profile-card card">
       <div class="profile-avatar-wrap">
@@ -48,6 +48,11 @@
           <button id="mute-btn" class="profile-action-btn profile-action-mute">Mute</button>
         </div>
       </div>
+    </div>
+
+    <div id="shelf-card" class="card" style="display:none;margin-bottom:.625rem">
+      <div class="shelf-label" id="shelf-label">Shelf</div>
+      <div class="shelf-covers" id="shelf-covers"></div>
     </div>
 
     <div class="profile-links" id="own-links" style="display:none">
@@ -132,12 +137,30 @@
     const targetParam = params.get('u')?.toLowerCase();
     const isOwn       = !targetParam || targetParam === myProfile.username;
 
+    function renderShelf(shelf, username) {
+      if (!shelf?.length) return;
+      document.getElementById('shelf-label').textContent = `${username}'s Shelf`;
+      const coversEl = document.getElementById('shelf-covers');
+      shelf.forEach(item => {
+        if (!item.coverUrl) return;
+        const a = document.createElement('a');
+        a.href = `../book/?gbid=${encodeURIComponent(item.gbid)}`;
+        a.style.cssText = 'text-decoration:none;display:block';
+        const img = document.createElement('img');
+        img.src = item.coverUrl; img.alt = item.title || ''; img.className = 'shelf-cover';
+        a.appendChild(img);
+        coversEl.appendChild(a);
+      });
+      document.getElementById('shelf-card').style.display = '';
+    }
+
     try {
       if (isOwn) {
         const avatarEl = document.getElementById('profile-avatar');
         if (myProfile.avatarUrl) { avatarEl.innerHTML  = `<img src="${myProfile.avatarUrl}" alt="">`; }
         else                     { avatarEl.textContent = myProfile.username[0].toUpperCase(); }
 
+        renderShelf(myProfile.shelf, myProfile.username);
         document.getElementById('own-actions').style.display  = '';
         document.getElementById('profile-name').textContent    = myProfile.username;
         document.getElementById('following-count').textContent = (myProfile.following || myProfile.friends || []).length;
@@ -167,6 +190,7 @@
           } else {
             avatarEl.textContent = target.username[0].toUpperCase();
           }
+          renderShelf(target.shelf, target.username);
           document.getElementById('profile-name').textContent = target.username;
 
           document.getElementById('other-following-count').textContent = (target.following || []).length;
