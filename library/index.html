@@ -186,14 +186,14 @@
     const TRASH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
 
     function bookCoverHtml(book) {
-      const inner = book.coverUrl?.startsWith('https://')
+      const inner = book.coverUrl
         ? `<img class="book-cover book-cover-img" src="${esc(book.coverUrl)}" alt="">`
         : `<div class="book-cover">📖</div>`;
       return `<div class="book-cover-wrap">${inner}</div>`;
     }
 
     function coverInnerHtml(book) {
-      return book.coverUrl?.startsWith('https://')
+      return book.coverUrl
         ? `<img class="book-cover book-cover-img" src="${esc(book.coverUrl)}" alt="">`
         : `<div class="book-cover">📖</div>`;
     }
@@ -211,6 +211,13 @@
       overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
       const grid = modal.querySelector('#cpg');
+
+      function bestCoverUrl(url) {
+        if (!url) return url;
+        // OpenLibrary: upgrade S or M thumbnails to L
+        url = url.replace(/-(S|M)\.jpg(\?|$)/, '-L.jpg$2');
+        return url;
+      }
 
       async function hcPost(query, variables) {
         const r = await fetch(HARDCOVER_PROXY, {
@@ -244,34 +251,32 @@
 
         if (bookIds.length) {
           const d = await hcPost(
-            `query($ids:[Int!]!){editions(where:{book_id:{_in:$ids}},limit:100){id image{url} publisher{name} release_year}}`,
+            `query($ids:[Int!]!){editions(where:{book_id:{_in:$ids}},limit:100){id image{url width height} publisher{name} release_year}}`,
             { ids: bookIds }
           );
           const seen = new Set();
           editions = (d?.data?.editions || []).filter(e => {
-            if (!e.image?.url || seen.has(e.image.url)) return false;
-            seen.add(e.image.url);
+            if (!e.image?.url) return false;
+            // Filter out low-res covers (width known and too small for a shelf)
+            if (e.image.width && e.image.width < 180) return false;
+            const url = bestCoverUrl(e.image.url);
+            if (seen.has(url)) return false;
+            seen.add(url);
+            e.image.url = url;
             return true;
           });
         }
 
         grid.innerHTML = '';
 
-        // Deduplicate editions against current cover
-        const currentUrl = book.coverUrl?.startsWith('https://') ? book.coverUrl : null;
+        const currentUrl = book.coverUrl || null;
         const filteredEditions = editions.filter(e => e.image.url !== currentUrl);
-
-        if (!currentUrl && !filteredEditions.length) {
-          grid.innerHTML = '<span style="font-size:.85rem;color:var(--text-muted)">No covers found.</span>';
-          return;
-        }
 
         async function pickCover(url) {
           if (url === book.coverUrl) { overlay.remove(); return; }
           await updateBookCover(user.uid, book.id, url);
           book.coverUrl = url;
           wrapEl.innerHTML = coverInnerHtml(book);
-          // Sync shelf if this book is on it
           if (profile.shelf?.some(s => s.gbid === book.gbid && book.gbid)) {
             const updatedShelf = profile.shelf.map(s =>
               s.gbid === book.gbid ? { ...s, coverUrl: url } : s
@@ -284,7 +289,7 @@
           overlay.remove();
         }
 
-        // Current cover first
+        // Current cover first (selected state)
         if (currentUrl) {
           const item = document.createElement('div');
           item.className = 'cover-picker-item selected';
@@ -292,6 +297,57 @@
           item.innerHTML = `<img src="${esc(currentUrl)}" alt="" loading="lazy">`;
           item.addEventListener('click', () => overlay.remove());
           grid.appendChild(item);
+        }
+
+        // Upload custom cover
+        const uploadInput = document.createElement('input');
+        uploadInput.type = 'file';
+        uploadInput.accept = 'image/*';
+        uploadInput.style.display = 'none';
+        modal.appendChild(uploadInput);
+
+        const uploadItem = document.createElement('div');
+        uploadItem.className = 'cover-picker-item cover-picker-upload';
+        uploadItem.title = 'Upload custom cover';
+        uploadItem.innerHTML = `<div class="cover-picker-upload-inner">+</div>`;
+        uploadItem.addEventListener('click', () => uploadInput.click());
+        uploadInput.addEventListener('change', async () => {
+          const file = uploadInput.files[0];
+          if (!file) return;
+          uploadInput.value = '';
+          uploadItem.style.opacity = '0.5';
+          try {
+            const dataUrl = await new Promise((resolve, reject) => {
+              const img = new Image();
+              const objectUrl = URL.createObjectURL(file);
+              img.onload = () => {
+                URL.revokeObjectURL(objectUrl);
+                const MAX_W = 400, MAX_H = 600;
+                const scale = Math.min(MAX_W / img.width, MAX_H / img.height, 1);
+                const w = Math.round(img.width * scale);
+                const h = Math.round(img.height * scale);
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', 0.85));
+              };
+              img.onerror = reject;
+              img.src = objectUrl;
+            });
+            await pickCover(dataUrl);
+          } catch (e) {
+            console.error(e);
+            uploadItem.style.opacity = '';
+            alert('Could not load that image.');
+          }
+        });
+        grid.appendChild(uploadItem);
+
+        if (!filteredEditions.length) {
+          const msg = document.createElement('div');
+          msg.style.cssText = 'font-size:.85rem;color:var(--text-muted);width:100%;padding-top:.25rem';
+          msg.textContent = currentUrl ? 'No other edition covers found.' : 'No edition covers found.';
+          grid.appendChild(msg);
         }
 
         filteredEditions.forEach(ed => {

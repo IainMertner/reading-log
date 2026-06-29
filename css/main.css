@@ -814,6 +814,10 @@ a { color: inherit; }
 .cover-picker-item:hover { border-color: var(--accent); transform: scale(1.04); }
 .cover-picker-item.selected { border-color: var(--accent); }
 .cover-picker-item img { width: 100%; display: block; aspect-ratio: 2/3; object-fit: cover; }
+.cover-picker-upload { aspect-ratio: 2/3; border: 2px dashed var(--border) !important; display: flex; align-items: center; justify-content: center; }
+.cover-picker-upload:hover { border-color: var(--accent) !important; }
+.cover-picker-upload-inner { font-size: 2rem; line-height: 1; color: var(--text-muted); pointer-events: none; }
+.cover-picker-upload:hover .cover-picker-upload-inner { color: var(--accent); }
 
 /* Edit shelf */
 .shelf-edit-list { display: flex; flex-wrap: wrap; gap: .625rem; margin-bottom: .75rem; min-height: 0; }
