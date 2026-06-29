@@ -181,6 +181,15 @@
       return wrap;
     }
 
+    const TRASH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+
+    function bookCoverHtml(book) {
+      if (book.coverUrl?.startsWith('https://')) {
+        return `<img class="book-cover book-cover-img" src="${book.coverUrl}" alt="">`;
+      }
+      return `<div class="book-cover">📖</div>`;
+    }
+
     function tsOf(book, field) {
       const ts = book[field];
       if (!ts) return 0;
@@ -299,7 +308,7 @@
         ? `<a class="book-title" href="../book/?gbid=${esc(book.gbid)}" style="text-decoration:none;color:inherit">${esc(book.title)}</a>`
         : `<span class="book-title">${esc(book.title)}</span>`;
       card.innerHTML = `<div class="book-entry">
-        <div class="book-cover">📖</div>
+        ${bookCoverHtml(book)}
         <div class="book-info">
           ${titleHtml}
           ${book.author ? `<div class="book-author">${esc(book.author)}</div>` : ''}
@@ -316,7 +325,7 @@
             <button class="btn-finished">Finished</button>
           </div>
         </div>
-        <button class="btn-remove-x" aria-label="Remove" title="Remove">✕</button>
+        <button class="btn-remove-x" aria-label="Remove" title="Remove">${TRASH_ICON}</button>
       </div>`;
       card.querySelector('.book-started-date').replaceWith(makeDateEl('Started', book.addedAt, 'addedAt', book));
 
@@ -406,7 +415,7 @@
         : '';
 
       card.innerHTML = `<div class="book-entry">
-        <div class="book-cover">📖</div>
+        ${bookCoverHtml(book)}
         <div class="book-info">
           ${titleHtml}
           ${book.author ? `<div class="book-author">${esc(book.author)}</div>` : ''}
@@ -415,7 +424,7 @@
           ${reviewHtml}
           <div class="rating-edit-form" style="display:none;margin-top:.75rem"></div>
         </div>
-        <button class="btn-remove-x" aria-label="Remove" title="Remove">✕</button>
+        <button class="btn-remove-x" aria-label="Remove" title="Remove">${TRASH_ICON}</button>
       </div>`;
 
       const rangeEl = card.querySelector('.book-date-range');
@@ -493,7 +502,7 @@
         ? `<a class="book-title" href="../book/?gbid=${esc(book.gbid)}" style="text-decoration:none;color:inherit">${esc(book.title)}</a>`
         : `<span class="book-title">${esc(book.title)}</span>`;
       card.innerHTML = `<div class="book-entry">
-        <div class="book-cover">📖</div>
+        ${bookCoverHtml(book)}
         <div class="book-info">
           ${titleHtml}
           ${book.author ? `<div class="book-author">${esc(book.author)}</div>` : ''}
@@ -522,7 +531,7 @@
         ? `<div class="review-preview">${esc(book.review.slice(0, 100))}${book.review.length > 100 ? '…' : ''}</div>`
         : '';
       card.innerHTML = `<div class="book-entry">
-        <div class="book-cover">📖</div>
+        ${bookCoverHtml(book)}
         <div class="book-info">
           ${titleHtml}
           ${book.author ? `<div class="book-author">${esc(book.author)}</div>` : ''}
@@ -686,7 +695,7 @@
 
         el.addEventListener('mousedown', e => {
           e.preventDefault();
-          selectedBook             = { title, author, pages, gbid: slug };
+          selectedBook             = { title, author, pages, gbid: slug, cover };
           searchInput.value        = title;
           suggestBox.innerHTML     = '';
           suggestBox.style.display = 'none';
@@ -703,13 +712,13 @@
 
     saveBtn.addEventListener('click', async () => {
       if (!selectedBook) return;
-      const { title, author, pages, gbid } = selectedBook;
+      const { title, author, pages, gbid, cover } = selectedBook;
 
       saveBtn.disabled    = true;
       saveBtn.textContent = 'Adding…';
 
-      const id   = await addBook(user.uid, { title, author, totalPages: pages, gbid }, profile.username);
-      const book = { id, title, author, totalPages: pages, currentPage: 0, status: 'reading', gbid, addedAt: { toDate: () => new Date() } };
+      const id   = await addBook(user.uid, { title, author, totalPages: pages, gbid, coverUrl: cover }, profile.username);
+      const book = { id, title, author, totalPages: pages, currentPage: 0, status: 'reading', gbid, coverUrl: cover, addedAt: { toDate: () => new Date() } };
 
       document.getElementById('reading-empty')?.remove();
       readingList.prepend(renderReading(book));
@@ -721,7 +730,7 @@
 
     finishedBtn.addEventListener('click', () => {
       if (!selectedBook) return;
-      const { title, author, pages, gbid } = selectedBook;
+      const { title, author, pages, gbid, cover } = selectedBook;
 
       const fields     = form.querySelector('.add-book-fields');
       const actions    = form.querySelector('.add-book-actions');
@@ -772,12 +781,13 @@
         const { date: addedAt,    precision: startedPrec  } = startedPicker.getDate();
         const { date: finishedAt, precision: finishedPrec } = datePicker.getDate();
         const id = await addFinishedBook(user.uid, {
-          title, author, totalPages: pages, gbid, rating, review,
+          title, author, totalPages: pages, gbid, coverUrl: cover, rating, review,
           finishedAt, finishedAtPrecision: finishedPrec === 'year' ? 'year' : undefined,
           addedAt,    addedAtPrecision:    startedPrec  === 'year' ? 'year' : undefined
         }, profile.username);
         const book = {
           id, title, author, totalPages: pages, currentPage: pages, status: 'finished',
+          coverUrl:            cover,
           addedAt:             addedAt    ? { toDate: () => addedAt }    : { toDate: () => new Date() },
           addedAtPrecision:    startedPrec  === 'year' ? 'year' : null,
           finishedAt:          finishedAt  ? { toDate: () => finishedAt } : null,

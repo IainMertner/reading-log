@@ -161,7 +161,7 @@ export async function getBooks(uid) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-export async function addFinishedBook(uid, { title, author, totalPages, gbid, rating, review, finishedAt, finishedAtPrecision, addedAt, addedAtPrecision }, username) {
+export async function addFinishedBook(uid, { title, author, totalPages, gbid, coverUrl, rating, review, finishedAt, finishedAtPrecision, addedAt, addedAtPrecision }, username) {
   const data = {
     title,
     author:      author || '',
@@ -174,8 +174,9 @@ export async function addFinishedBook(uid, { title, author, totalPages, gbid, ra
   if (finishedAt)          data.finishedAt          = finishedAt;
   if (finishedAtPrecision) data.finishedAtPrecision = finishedAtPrecision;
   if (addedAt && addedAtPrecision) data.addedAtPrecision = addedAtPrecision;
-  if (rating != null) data.rating = rating;
-  if (review)         data.review = review;
+  if (coverUrl)       data.coverUrl       = coverUrl;
+  if (rating != null) data.rating         = rating;
+  if (review)         data.review         = review;
   const [bookRef] = await Promise.all([
     addDoc(collection(db, 'users', uid, 'books'), data),
     addDoc(collection(db, 'activity'), {
@@ -193,17 +194,19 @@ export async function addFinishedBook(uid, { title, author, totalPages, gbid, ra
   return bookRef.id;
 }
 
-export async function addBook(uid, { title, author, totalPages, gbid }, username) {
+export async function addBook(uid, { title, author, totalPages, gbid, coverUrl }, username) {
+  const bookData = {
+    title,
+    author:      author || '',
+    totalPages:  totalPages || 0,
+    currentPage: 0,
+    status:      'reading',
+    gbid:        gbid || '',
+    addedAt:     serverTimestamp()
+  };
+  if (coverUrl) bookData.coverUrl = coverUrl;
   const [bookRef] = await Promise.all([
-    addDoc(collection(db, 'users', uid, 'books'), {
-      title,
-      author:      author || '',
-      totalPages:  totalPages || 0,
-      currentPage: 0,
-      status:      'reading',
-      gbid:        gbid || '',
-      addedAt:     serverTimestamp()
-    }),
+    addDoc(collection(db, 'users', uid, 'books'), bookData),
     addDoc(collection(db, 'activity'), {
       uid,
       username,

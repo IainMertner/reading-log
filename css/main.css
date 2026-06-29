@@ -573,7 +573,15 @@ a { color: inherit; }
   font-style: italic; margin-top: .25rem; line-height: 1.45;
 }
 
-/* ✕ remove button on book cards */
+/* book cover image */
+.book-cover-img {
+  display: block;
+  object-fit: cover;
+  background: none;
+  border: none;
+}
+
+/* remove button on book cards */
 .btn-remove-x {
   flex-shrink: 0;
   align-self: flex-start;
@@ -584,7 +592,6 @@ a { color: inherit; }
   width: 1.5rem; height: 1.5rem;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
-  font-size: .7rem;
   color: var(--text-muted);
   transition: color .15s, border-color .15s;
   padding: 0;
