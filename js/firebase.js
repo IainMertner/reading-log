@@ -225,6 +225,10 @@ export function finishBook(uid, bookId, { title, author, gbid, rating, review } 
   ]);
 }
 
+export function updateBookDates(uid, bookId, updates) {
+  return updateDoc(doc(db, 'users', uid, 'books', bookId), updates);
+}
+
 export function updateBookRating(uid, bookId, { rating, review }) {
   return updateDoc(doc(db, 'users', uid, 'books', bookId), {
     rating: rating != null ? rating : deleteField(),

@@ -101,7 +101,7 @@
   <script>document.body.classList.add('auth-loading');</script>
   <script type="module">
     import { requireAuth } from '../js/auth.js';
-    import { getBooks, addBook, addFinishedBook, updateBookProgress, finishBook, deleteBook, unfinishBook, updateBookRating } from '../js/firebase.js';
+    import { getBooks, addBook, addFinishedBook, updateBookProgress, finishBook, deleteBook, unfinishBook, updateBookRating, updateBookDates } from '../js/firebase.js';
 
     const { user, profile } = await requireAuth();
     const readingList  = document.getElementById('reading-list');
@@ -170,6 +170,50 @@
       return wrap;
     }
 
+    function toDateInputVal(ts) {
+      if (!ts?.toDate) return '';
+      const d = ts.toDate();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function makeDateEl(label, ts, field, bookId) {
+      const el = document.createElement('div');
+      el.className = 'book-finished-meta book-date-editable';
+      const dateStr = ts?.toDate?.()
+        ? ts.toDate().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+        : 'Unknown';
+      el.textContent = `${label} ${dateStr}`;
+
+      el.addEventListener('click', () => {
+        const initialVal = toDateInputVal(ts);
+        const input = document.createElement('input');
+        input.type = 'date';
+        input.className = 'date-edit-input';
+        input.value = initialVal;
+        el.replaceWith(input);
+        input.focus();
+
+        let done = false;
+        async function commit() {
+          if (done) return;
+          done = true;
+          const val = input.value;
+          let newTs = ts;
+          if (val && val !== initialVal) {
+            const newDate = new Date(val + 'T12:00:00');
+            await updateBookDates(user.uid, bookId, { [field]: newDate });
+            newTs = { toDate: () => newDate };
+          }
+          input.replaceWith(makeDateEl(label, newTs, field, bookId));
+        }
+
+        input.addEventListener('change', commit);
+        input.addEventListener('blur', commit);
+      });
+
+      return el;
+    }
+
     function renderReading(book) {
       const pct  = book.totalPages ? Math.round((book.currentPage / book.totalPages) * 100) : 0;
       const card = document.createElement('div');
@@ -183,6 +227,7 @@
         <div class="book-info">
           ${titleHtml}
           ${book.author ? `<div class="book-author">${esc(book.author)}</div>` : ''}
+          <div class="book-started-date"></div>
           <div class="progress-bar-track">
             <div class="progress-bar-fill" style="width:${pct}%"></div>
           </div>
@@ -197,6 +242,7 @@
         </div>
         <button class="btn-remove-x" aria-label="Remove" title="Remove">✕</button>
       </div>`;
+      card.querySelector('.book-started-date').replaceWith(makeDateEl('Started', book.addedAt, 'addedAt', book.id));
 
       const inputs    = card.querySelectorAll('.page-input');
       const fillEl    = card.querySelector('.progress-bar-fill');
@@ -273,9 +319,6 @@
     }
 
     function renderFinished(book) {
-      const when = book.finishedAt?.toDate?.()
-        ? book.finishedAt.toDate().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
-        : 'Recently';
       const card = document.createElement('div');
       card.className  = 'card';
       card.dataset.id = book.id;
@@ -292,7 +335,7 @@
         <div class="book-info">
           ${titleHtml}
           ${book.author ? `<div class="book-author">${esc(book.author)}</div>` : ''}
-          <div class="book-finished-meta">Finished ${when}</div>
+          <div class="book-finished-date"></div>
           ${starsHtml}
           ${reviewHtml}
           <div class="progress-controls" style="margin-top:.5rem">
@@ -302,6 +345,7 @@
         </div>
         <button class="btn-remove-x" aria-label="Remove" title="Remove">✕</button>
       </div>`;
+      card.querySelector('.book-finished-date').replaceWith(makeDateEl('Finished', book.finishedAt, 'finishedAt', book.id));
 
       card.querySelector('.btn-rate').addEventListener('click', () => {
         const editForm = card.querySelector('.rating-edit-form');
