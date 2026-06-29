@@ -2,6 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" crossorigin>
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" crossorigin>
+  <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" crossorigin>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Library — Reading Log</title>
   <link rel="stylesheet" href="../css/main.css">
@@ -102,7 +107,7 @@
   <script>document.body.classList.add('auth-loading');</script>
   <script type="module">
     import { requireAuth } from '../js/auth.js';
-    import { getBooks, addBook, addFinishedBook, updateBookProgress, finishBook, deleteBook, unfinishBook, updateBookRating, updateBookDates, getProfileByUsername } from '../js/firebase.js';
+    import { getBooks, addBook, addFinishedBook, updateBookProgress, finishBook, deleteBook, unfinishBook, updateBookRating, updateBookDates, clearBookDate, getProfileByUsername } from '../js/firebase.js';
 
     const { user, profile } = await requireAuth();
 
@@ -184,49 +189,102 @@
       return 0;
     }
 
-    function toDateInputVal(ts) {
-      if (!ts?.toDate) return '';
+    function formatDateTs(ts, precision) {
+      if (!ts?.toDate) return 'Unknown';
       const d = ts.toDate();
-      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      if (precision === 'year') return String(d.getFullYear());
+      if (precision === 'day')  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    }
+
+    function createPartialDatePicker(ts, precision) {
+      const d = ts?.toDate?.() ?? null;
+      const initYear  = d ? d.getFullYear() : '';
+      const initMonth = (d && precision !== 'year') ? d.getMonth() + 1 : '';
+      const initDay   = (d && precision !== 'year' && precision !== 'month') ? d.getDate() : '';
+
+      const wrap = document.createElement('div');
+      wrap.className = 'date-picker-partial';
+
+      const dayInput = document.createElement('input');
+      dayInput.type = 'text'; dayInput.inputMode = 'numeric'; dayInput.maxLength = 2;
+      dayInput.className = 'date-day-input'; dayInput.placeholder = 'Day';
+      dayInput.value = initDay;
+
+      const monthSel = document.createElement('select');
+      monthSel.className = 'date-month-select';
+      monthSel.innerHTML = '<option value="">Month</option>' +
+        ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+          .map((m, i) => `<option value="${i+1}"${initMonth === i+1 ? ' selected' : ''}>${m}</option>`)
+          .join('');
+
+      const yearInput = document.createElement('input');
+      yearInput.type = 'text'; yearInput.inputMode = 'numeric'; yearInput.maxLength = 4;
+      yearInput.className = 'date-year-input'; yearInput.placeholder = 'Year';
+      yearInput.value = initYear;
+
+      wrap.append(dayInput, monthSel, yearInput);
+
+      wrap.getDate = () => {
+        const year = parseInt(yearInput.value);
+        if (!year || year < 1000 || year > 2200) return { date: null, precision: null };
+        const month = parseInt(monthSel.value) || 0;
+        const day   = parseInt(dayInput.value)  || 0;
+        if (!month) return { date: new Date(year, 0, 1, 12, 0, 0), precision: 'year' };
+        if (!day)   return { date: new Date(year, month - 1, 1, 12, 0, 0), precision: 'month' };
+        return { date: new Date(year, month - 1, Math.min(day, 31), 12, 0, 0), precision: 'day' };
+      };
+
+      return wrap;
     }
 
     function makeDateEl(label, ts, field, book, withActivity = true) {
+      const precision = book[field + 'Precision'] ?? null;
       const el = document.createElement('div');
       el.className = 'book-finished-meta book-date-editable';
-      const dateStr = ts?.toDate?.()
-        ? ts.toDate().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
-        : 'Unknown';
-      el.textContent = label ? `${label} ${dateStr}` : dateStr;
+      el.textContent = label
+        ? `${label} ${formatDateTs(ts, precision)}`
+        : formatDateTs(ts, precision);
 
       el.addEventListener('click', () => {
-        const initialVal = toDateInputVal(ts);
-        const input = document.createElement('input');
-        input.type = 'date';
-        input.className = 'date-edit-input';
-        input.value = initialVal;
-        el.replaceWith(input);
-        input.focus();
+        const picker = createPartialDatePicker(ts, precision);
 
-        let done = false;
-        async function commit() {
-          if (done) return;
-          done = true;
-          const val = input.value;
-          let newTs = ts;
-          if (val && val !== initialVal) {
-            const newDate = new Date(val + 'T12:00:00');
-            const bookInfo = withActivity ? {
-              title: book.title, author: book.author, gbid: book.gbid,
-              rating: book.rating, review: book.review, username: profile.username
-            } : null;
-            await updateBookDates(user.uid, book.id, { [field]: newDate }, bookInfo);
-            newTs = { toDate: () => newDate };
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button'; saveBtn.className = 'join-club-btn date-action-btn';
+        saveBtn.textContent = 'Save';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button'; cancelBtn.className = 'btn-update date-action-btn';
+        cancelBtn.textContent = 'Cancel';
+
+        const editorWrap = document.createElement('div');
+        editorWrap.className = 'date-editor-wrap';
+        editorWrap.append(picker, saveBtn, cancelBtn);
+        el.replaceWith(editorWrap);
+
+        saveBtn.addEventListener('click', async () => {
+          const { date, precision: newPrec } = picker.getDate();
+          if (!date) {
+            editorWrap.replaceWith(makeDateEl(label, ts, field, book, withActivity));
+            return;
           }
-          input.replaceWith(makeDateEl(label, newTs, field, book, withActivity));
-        }
+          const updates = {
+            [field]: date,
+            [field + 'Precision']: newPrec
+          };
+          const bookInfo = withActivity ? {
+            title: book.title, author: book.author, gbid: book.gbid,
+            rating: book.rating, review: book.review, username: profile.username
+          } : null;
+          await updateBookDates(user.uid, book.id, updates, bookInfo);
+          book[field] = { toDate: () => date };
+          book[field + 'Precision'] = newPrec;
+          editorWrap.replaceWith(makeDateEl(label, book[field], field, book, withActivity));
+        });
 
-        input.addEventListener('change', commit);
-        input.addEventListener('blur', commit);
+        cancelBtn.addEventListener('click', () => {
+          editorWrap.replaceWith(makeDateEl(label, ts, field, book, withActivity));
+        });
       });
 
       return el;
@@ -446,11 +504,14 @@
     }
 
     function renderFinishedView(book) {
-      const fmt = ts => ts?.toDate?.()
-        ? ts.toDate().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
-        : null;
-      const whenStarted  = fmt(book.addedAt);
-      const whenFinished = fmt(book.finishedAt);
+      const fmt = (ts, prec) => {
+        if (!ts?.toDate) return null;
+        const d = ts.toDate();
+        if (prec === 'year') return String(d.getFullYear());
+        return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+      };
+      const whenStarted  = fmt(book.addedAt, book.addedAtPrecision);
+      const whenFinished = fmt(book.finishedAt, book.finishedAtPrecision);
       const card = document.createElement('div');
       card.className = 'card';
       const titleHtml = book.gbid
@@ -680,14 +741,12 @@
       const startedLabel = document.createElement('div');
       startedLabel.style.cssText = 'font-size:.8rem;color:var(--text-muted);margin:.5rem 0 .25rem';
       startedLabel.textContent = 'Date started (optional)';
-      const startedInput = document.createElement('input');
-      startedInput.type = 'date'; startedInput.className = 'date-edit-input';
+      const startedPicker = createPartialDatePicker(null, null);
       const dateLabel = document.createElement('div');
       dateLabel.style.cssText = 'font-size:.8rem;color:var(--text-muted);margin:.5rem 0 .25rem';
       dateLabel.textContent = 'Date finished (optional)';
-      const dateInput = document.createElement('input');
-      dateInput.type = 'date'; dateInput.className = 'date-edit-input';
-      ratingDiv.append(titleLabel, rateLabel, picker, ta, startedLabel, startedInput, dateLabel, dateInput);
+      const datePicker = createPartialDatePicker(null, null);
+      ratingDiv.append(titleLabel, rateLabel, picker, ta, startedLabel, startedPicker, dateLabel, datePicker);
       fields.appendChild(ratingDiv);
 
       actions.innerHTML = '';
@@ -708,13 +767,19 @@
         confirmBtn.disabled = true; confirmBtn.textContent = 'Adding…';
         const rating = picker.getValue();
         const review = ta.value.trim() || null;
-        const addedAt    = startedInput.value ? new Date(startedInput.value + 'T12:00:00') : null;
-        const finishedAt = dateInput.value    ? new Date(dateInput.value    + 'T12:00:00') : null;
-        const id   = await addFinishedBook(user.uid, { title, author, totalPages: pages, gbid, rating, review, finishedAt, addedAt }, profile.username);
+        const { date: addedAt,    precision: startedPrec  } = startedPicker.getDate();
+        const { date: finishedAt, precision: finishedPrec } = datePicker.getDate();
+        const id = await addFinishedBook(user.uid, {
+          title, author, totalPages: pages, gbid, rating, review,
+          finishedAt, finishedAtPrecision: finishedPrec === 'year' ? 'year' : undefined,
+          addedAt,    addedAtPrecision:    startedPrec  === 'year' ? 'year' : undefined
+        }, profile.username);
         const book = {
           id, title, author, totalPages: pages, currentPage: pages, status: 'finished',
-          addedAt:    addedAt    ? { toDate: () => addedAt }    : { toDate: () => new Date() },
-          finishedAt: finishedAt ? { toDate: () => finishedAt } : null,
+          addedAt:             addedAt    ? { toDate: () => addedAt }    : { toDate: () => new Date() },
+          addedAtPrecision:    startedPrec  === 'year' ? 'year' : null,
+          finishedAt:          finishedAt  ? { toDate: () => finishedAt } : null,
+          finishedAtPrecision: finishedPrec === 'year' ? 'year' : null,
           gbid, rating, review
         };
         document.getElementById('finished-empty')?.remove();

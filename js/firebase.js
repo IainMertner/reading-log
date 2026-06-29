@@ -73,6 +73,7 @@ export function signIn(username, password) {
 }
 
 export function logOut() {
+  localStorage.removeItem('rl_profile');
   return fbSignOut(auth);
 }
 
@@ -160,7 +161,7 @@ export async function getBooks(uid) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-export async function addFinishedBook(uid, { title, author, totalPages, gbid, rating, review, finishedAt, addedAt }, username) {
+export async function addFinishedBook(uid, { title, author, totalPages, gbid, rating, review, finishedAt, finishedAtPrecision, addedAt, addedAtPrecision }, username) {
   const data = {
     title,
     author:      author || '',
@@ -170,7 +171,9 @@ export async function addFinishedBook(uid, { title, author, totalPages, gbid, ra
     gbid:        gbid || '',
     addedAt:     addedAt || serverTimestamp()
   };
-  if (finishedAt) data.finishedAt = finishedAt;
+  if (finishedAt)          data.finishedAt          = finishedAt;
+  if (finishedAtPrecision) data.finishedAtPrecision = finishedAtPrecision;
+  if (addedAt && addedAtPrecision) data.addedAtPrecision = addedAtPrecision;
   if (rating != null) data.rating = rating;
   if (review)         data.review = review;
   const [bookRef] = await Promise.all([
@@ -258,11 +261,21 @@ async function upsertActivityTimestamp(uid, type, date, { title, author, gbid, r
 }
 
 export async function updateBookDates(uid, bookId, updates, bookInfo) {
-  await updateDoc(doc(db, 'users', uid, 'books', bookId), updates);
+  const firestoreUpdates = { ...updates };
+  if (firestoreUpdates.addedAtPrecision    === null) firestoreUpdates.addedAtPrecision    = deleteField();
+  if (firestoreUpdates.finishedAtPrecision === null) firestoreUpdates.finishedAtPrecision = deleteField();
+  await updateDoc(doc(db, 'users', uid, 'books', bookId), firestoreUpdates);
   if (bookInfo) {
     if (updates.addedAt    instanceof Date) await upsertActivityTimestamp(uid, 'started',  updates.addedAt,    bookInfo);
     if (updates.finishedAt instanceof Date) await upsertActivityTimestamp(uid, 'finished', updates.finishedAt, bookInfo);
   }
+}
+
+export function clearBookDate(uid, bookId, field) {
+  return updateDoc(doc(db, 'users', uid, 'books', bookId), {
+    [field]: deleteField(),
+    [`${field}Precision`]: deleteField()
+  });
 }
 
 export function updateBookRating(uid, bookId, { rating, review }) {

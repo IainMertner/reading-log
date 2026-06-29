@@ -20,12 +20,29 @@ export function requireAuth() {
       clearTimeout(timer);
       off();
       if (!user) {
+        localStorage.removeItem('rl_profile');
         window.location.replace(ROOT + 'login/');
         return;
       }
       try {
+        // Serve from localStorage cache for instant resolution on repeat visits
+        const cached = localStorage.getItem('rl_profile');
+        if (cached) {
+          try {
+            const p = JSON.parse(cached);
+            if (p.uid === user.uid && p.username) {
+              resolve({ user, profile: p });
+              // Refresh in background — update cache if anything changed
+              getProfile(user.uid).then(fresh => {
+                if (fresh?.username) localStorage.setItem('rl_profile', JSON.stringify({ uid: user.uid, ...fresh }));
+              }).catch(() => {});
+              return;
+            }
+          } catch { /* corrupt cache — fall through to full fetch */ }
+        }
         let profile = await getProfile(user.uid);
         if (!profile || !profile.username) profile = await repairProfile(user);
+        localStorage.setItem('rl_profile', JSON.stringify({ uid: user.uid, ...profile }));
         resolve({ user, profile });
       } catch (err) {
         reject(err);
