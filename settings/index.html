@@ -38,7 +38,18 @@
       <div class="settings-list">
         <div class="settings-row">
           <span class="settings-row-label">Username</span>
-          <span class="settings-row-value" id="settings-username">—</span>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span class="settings-row-value" id="settings-username">—</span>
+            <button class="btn-update" id="change-username-btn" type="button" style="font-size:.75rem;padding:.2rem .5rem">Change</button>
+          </div>
+        </div>
+        <div class="settings-row" id="change-username-row" style="display:none;flex-direction:column;align-items:flex-start;gap:.5rem;padding:.75rem 1rem">
+          <input type="text" id="new-username-input" class="join-club-input" placeholder="New username" maxlength="20" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box">
+          <div style="display:flex;gap:.5rem">
+            <button class="join-club-btn" id="save-username-btn" type="button">Save</button>
+            <button class="btn-update" id="cancel-username-btn" type="button">Cancel</button>
+          </div>
+          <div id="username-error" style="font-size:.82rem;color:var(--danger,#d44);display:none"></div>
         </div>
         <div class="settings-row">
           <span class="settings-row-label">Sign out</span>
@@ -148,7 +159,7 @@
   <script>document.body.classList.add('auth-loading');</script>
   <script type="module">
     import { requireAuth } from '../js/auth.js';
-    import { logOut, ROOT, importBooks, getBooks, updateBookMeta } from '../js/firebase.js';
+    import { logOut, ROOT, importBooks, getBooks, updateBookMeta, changeUsername } from '../js/firebase.js';
 
     let currentUser = null;
 
@@ -163,6 +174,48 @@
     document.getElementById('signout-btn').addEventListener('click', async () => {
       await logOut();
       window.location.replace(ROOT + 'login/');
+    });
+
+    // ── Change username ───────────────────────────────────────────────────────
+    const changeUsernameBtn  = document.getElementById('change-username-btn');
+    const changeUsernameRow  = document.getElementById('change-username-row');
+    const newUsernameInput   = document.getElementById('new-username-input');
+    const saveUsernameBtn    = document.getElementById('save-username-btn');
+    const cancelUsernameBtn  = document.getElementById('cancel-username-btn');
+    const usernameError      = document.getElementById('username-error');
+    const usernameDisplay    = document.getElementById('settings-username');
+
+    changeUsernameBtn.addEventListener('click', () => {
+      changeUsernameRow.style.display = '';
+      newUsernameInput.value = '';
+      usernameError.style.display = 'none';
+      newUsernameInput.focus();
+    });
+
+    cancelUsernameBtn.addEventListener('click', () => {
+      changeUsernameRow.style.display = 'none';
+    });
+
+    saveUsernameBtn.addEventListener('click', async () => {
+      const newUsername = newUsernameInput.value.trim().toLowerCase();
+      usernameError.style.display = 'none';
+      if (!currentUser) return;
+      const oldUsername = usernameDisplay.textContent;
+      if (newUsername === oldUsername) { changeUsernameRow.style.display = 'none'; return; }
+      saveUsernameBtn.disabled = true;
+      try {
+        await changeUsername(currentUser.uid, oldUsername, newUsername);
+        usernameDisplay.textContent = newUsername;
+        const cached = JSON.parse(localStorage.getItem('rl_profile') || '{}');
+        cached.username = newUsername;
+        localStorage.setItem('rl_profile', JSON.stringify(cached));
+        changeUsernameRow.style.display = 'none';
+      } catch (e) {
+        usernameError.textContent = e.message;
+        usernameError.style.display = '';
+      } finally {
+        saveUsernameBtn.disabled = false;
+      }
     });
 
     // ── Goodreads import ──────────────────────────────────────────────────────

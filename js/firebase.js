@@ -43,12 +43,6 @@ export const db   = getFirestore(app);
 // Base URL of the app, works on any host (GitHub Pages, localhost, etc.)
 export const ROOT = new URL('..', import.meta.url).href;
 
-// Firebase Auth requires an email address internally.
-// We synthesise one from the username so the user never has to provide one.
-function toEmail(username) {
-  return `${username}@readinglog.local`;
-}
-
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 export async function signUp(username, password) {
@@ -58,19 +52,43 @@ export async function signUp(username, password) {
   const taken = await getDoc(doc(db, 'usernames', username));
   if (taken.exists()) throw new Error('That username is already taken.');
 
-  const cred = await createUserWithEmailAndPassword(auth, toEmail(username), password);
+  // Use a random email so the auth identity is never coupled to the username.
+  const authEmail = `${crypto.randomUUID()}@readinglog.local`;
+  const cred = await createUserWithEmailAndPassword(auth, authEmail, password);
   const uid  = cred.user.uid;
 
   await Promise.all([
     setDoc(doc(db, 'users', uid),          { username, createdAt: serverTimestamp(), following: [] }),
-    setDoc(doc(db, 'usernames', username), { uid })
+    setDoc(doc(db, 'usernames', username), { uid, authEmail })
   ]);
 
   return cred.user;
 }
 
-export function signIn(username, password) {
-  return signInWithEmailAndPassword(auth, toEmail(username), password);
+export async function signIn(username, password) {
+  const snap = await getDoc(doc(db, 'usernames', username.toLowerCase()));
+  if (!snap.exists()) throw new Error('No account found with that username.');
+  // New accounts store authEmail; old accounts fall back to the legacy format.
+  const authEmail = snap.data().authEmail || `${username}@readinglog.local`;
+  return signInWithEmailAndPassword(auth, authEmail, password);
+}
+
+export async function changeUsername(uid, oldUsername, newUsername) {
+  if (!/^[a-z0-9_]{3,20}$/.test(newUsername)) {
+    throw new Error('Username must be 3–20 characters: lowercase letters, numbers, underscores.');
+  }
+  const taken = await getDoc(doc(db, 'usernames', newUsername));
+  if (taken.exists()) throw new Error('That username is already taken.');
+
+  // Carry the stored authEmail forward so sign-in keeps working.
+  const oldSnap   = await getDoc(doc(db, 'usernames', oldUsername));
+  const authEmail = oldSnap.data()?.authEmail || `${oldUsername}@readinglog.local`;
+
+  await Promise.all([
+    setDoc(doc(db, 'usernames', newUsername), { uid, authEmail }),
+    deleteDoc(doc(db, 'usernames', oldUsername)),
+    updateDoc(doc(db, 'users', uid), { username: newUsername }),
+  ]);
 }
 
 export function logOut() {
