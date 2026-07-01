@@ -229,6 +229,8 @@
                   </div>
                 </div>`;
                 item.addEventListener('click', async () => {
+                  item.style.background = 'var(--accent)';
+                  item.style.color      = '#fff';
                   suggestBox.style.display = 'none';
                   searchInput.value = '';
                   await addBookToList(user.uid, list.id, { gbid, title, author, coverUrl });
@@ -236,6 +238,11 @@
                     books = [...books, { gbid, title, author, coverUrl }];
                     renderBooks();
                   }
+                  const toast = document.createElement('div');
+                  toast.textContent = `✓ ${title} added`;
+                  toast.style.cssText = 'font-size:.8rem;color:var(--accent);margin-top:.4rem;font-weight:500';
+                  searchInput.parentElement.appendChild(toast);
+                  setTimeout(() => toast.remove(), 2000);
                 });
                 suggestBox.appendChild(item);
               });

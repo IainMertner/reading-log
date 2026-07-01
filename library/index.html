@@ -708,6 +708,7 @@
       });
 
       card.querySelector('.btn-remove-x').addEventListener('click', async () => {
+        if (!confirm(`Remove "${book.title}" from your library?`)) return;
         await deleteBook(user.uid, book.id, { title: book.title });
         coverCell.remove();
         closeModal();
@@ -794,6 +795,7 @@
       });
 
       card.querySelector('.btn-remove-x').addEventListener('click', async () => {
+        if (!confirm(`Remove "${book.title}" from your library?`)) return;
         await deleteBook(user.uid, book.id, { title: book.title });
         coverCell.remove();
         closeModal();
@@ -1098,11 +1100,15 @@
 
         el.addEventListener('mousedown', e => {
           e.preventDefault();
-          selectedBook             = { title, author, pages, gbid: slug, cover, releaseYear };
-          searchInput.value        = title;
-          suggestBox.innerHTML     = '';
-          suggestBox.style.display = 'none';
-          setAddEnabled(true);
+          el.style.background = 'var(--accent)';
+          el.style.color      = '#fff';
+          setTimeout(() => {
+            selectedBook             = { title, author, pages, gbid: slug, cover, releaseYear };
+            searchInput.value        = title;
+            suggestBox.innerHTML     = '';
+            suggestBox.style.display = 'none';
+            setAddEnabled(true);
+          }, 150);
         });
 
         suggestBox.appendChild(el);
