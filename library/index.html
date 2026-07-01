@@ -34,6 +34,10 @@
     <a class="back-link" id="back-link" href="../" style="display:none">← Back</a>
 
 
+    <div id="library-filter-wrap" style="display:none;margin-bottom:.625rem">
+      <input type="text" id="library-filter" class="join-club-input" placeholder="Filter library…" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box">
+    </div>
+
     <div class="add-book-card card" id="add-book-card">
       <button class="add-book-toggle" id="add-book-toggle">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
@@ -227,7 +231,9 @@
     function makeBookCoverCell(book) {
       const cell = document.createElement('div');
       cell.className = 'library-cover-cell';
-      cell.dataset.id = book.id;
+      cell.dataset.id     = book.id;
+      cell.dataset.title  = (book.title  || '').toLowerCase();
+      cell.dataset.author = (book.author || '').toLowerCase();
       if (book.coverUrl) {
         const img = document.createElement('img');
         img.src = book.coverUrl; img.alt = '';
@@ -917,6 +923,10 @@
           }
           if (!sorted.length) { showEmpty(finishedList, 'finished-empty', 'No finished books yet.'); return; }
           sorted.forEach(b => { const cell = makeBookCoverCell(b); attachCell(cell, b); finishedList.appendChild(cell); });
+          const q = (document.getElementById('library-filter')?.value || '').trim().toLowerCase();
+          if (q) finishedList.querySelectorAll('.library-cover-cell').forEach(cell => {
+            cell.style.display = (cell.dataset.title.includes(q) || cell.dataset.author.includes(q)) ? '' : 'none';
+          });
         };
 
         sortBtns.forEach(btn => btn.addEventListener('click', () => {
@@ -991,6 +1001,19 @@
 
           setupFinishedSort(finished, (cell, b) => cell.addEventListener('click', () => createBookModal(renderFinishedView(b))));
         }
+      }
+      if (readingList.querySelector('.library-cover-cell') || finishedList.querySelector('.library-cover-cell')) {
+        const filterWrap  = document.getElementById('library-filter-wrap');
+        const filterInput = document.getElementById('library-filter');
+        filterWrap.style.display = '';
+        filterInput.addEventListener('input', () => {
+          const q = filterInput.value.trim().toLowerCase();
+          [readingList, finishedList].forEach(container => {
+            container.querySelectorAll('.library-cover-cell').forEach(cell => {
+              cell.style.display = (!q || cell.dataset.title.includes(q) || cell.dataset.author.includes(q)) ? '' : 'none';
+            });
+          });
+        });
       }
     } finally {
       document.body.classList.remove('auth-loading');
