@@ -35,7 +35,11 @@
 
 
     <div id="library-filter-wrap" style="display:none;margin-bottom:.625rem">
-      <input type="text" id="library-filter" class="join-club-input" placeholder="Filter library…" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box">
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <input type="text" id="library-filter" class="join-club-input" placeholder="Filter library…" autocomplete="off" spellcheck="false" style="flex:1;min-width:0;box-sizing:border-box">
+        <button id="view-grid-btn" class="btn-update" title="Grid view" style="padding:.35rem .5rem;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></button>
+        <button id="view-list-btn" class="btn-update" title="List view" style="padding:.35rem .5rem;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1" fill="currentColor" stroke="none"/></svg></button>
+      </div>
     </div>
 
     <div class="add-book-card card" id="add-book-card">
@@ -121,6 +125,19 @@
     import { getBooks, addBook, addFinishedBook, updateBookProgress, finishBook, deleteBook, unfinishBook, updateBookRating, updateBookDates, updateBookCover, updateShelf, getProfileByUsername } from '../js/firebase.js';
 
     const HARDCOVER_PROXY = 'https://frosty-paper-e53b.phixel66.workers.dev/';
+
+    let viewMode = localStorage.getItem('library-view') || 'grid';
+
+    function makeBookListRow(book) {
+      const el = document.createElement('div');
+      el.dataset.title  = (book.title  || '').toLowerCase();
+      el.dataset.author = (book.author || '').toLowerCase();
+      el.style.cssText  = 'display:flex;align-items:center;padding:.35rem 0;border-bottom:1px solid var(--border);cursor:pointer;min-width:0;overflow:hidden';
+      const author  = book.author ? `<span style="color:var(--text-muted);font-weight:400"> · ${esc(book.author)}</span>` : '';
+      const stars   = book.rating ? `<span style="flex-shrink:0;margin-left:.5rem">${renderStars(book.rating)}</span>` : '';
+      el.innerHTML  = `<div style="flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:.875rem;font-weight:600">${esc(book.title)}${author}</div>${stars}`;
+      return el;
+    }
 
     async function hcPost(query, variables) {
       const r = await fetch(HARDCOVER_PROXY, {
@@ -703,22 +720,28 @@
           book.finishedAt = { toDate: () => new Date() };
           book.rating     = rating;
           book.review     = review;
-          coverCell.remove();
+          if (coverCell) coverCell.remove();
           closeModal();
-          if (!readingList.querySelector('.library-cover-cell')) showEmpty(readingList, 'reading-empty', 'Nothing in progress.');
+          if (!readingList.querySelector('[data-title]')) showEmpty(readingList, 'reading-empty', 'Nothing in progress.');
           document.getElementById('finished-empty')?.remove();
-          const newCell = makeBookCoverCell(book);
-          attachFinishedCell(newCell, book);
-          finishedList.prepend(newCell);
+          if (viewMode === 'list') {
+            const newRow = makeBookListRow(book);
+            newRow.addEventListener('click', () => { let ov; const c = renderFinished(book, newRow, () => ov?.remove()); ov = createBookModal(c); });
+            finishedList.prepend(newRow);
+          } else {
+            const newCell = makeBookCoverCell(book);
+            attachFinishedCell(newCell, book);
+            finishedList.prepend(newCell);
+          }
         });
       });
 
       card.querySelector('.btn-remove-x').addEventListener('click', async () => {
         if (!confirm(`Remove "${book.title}" from your library?`)) return;
         await deleteBook(user.uid, book.id, { title: book.title });
-        coverCell.remove();
+        if (coverCell) coverCell.remove();
         closeModal();
-        if (!readingList.querySelector('.library-cover-cell')) {
+        if (!readingList.querySelector('[data-title]')) {
           showEmpty(readingList, 'reading-empty', 'Nothing in progress.');
         }
       });
@@ -803,9 +826,9 @@
       card.querySelector('.btn-remove-x').addEventListener('click', async () => {
         if (!confirm(`Remove "${book.title}" from your library?`)) return;
         await deleteBook(user.uid, book.id, { title: book.title });
-        coverCell.remove();
+        if (coverCell) coverCell.remove();
         closeModal();
-        if (!finishedList.querySelector('.library-cover-cell')) {
+        if (!finishedList.querySelector('[data-title]')) {
           showEmpty(finishedList, 'finished-empty', 'No finished books yet.');
         }
       });
@@ -883,7 +906,7 @@
         document.getElementById('finished-title').textContent = `Finished · ${finished.length}`;
       }
 
-      function setupFinishedSort(finished, attachCell) {
+      function setupFinishedSort(finished, attachCell, listAttachFn) {
         const finishedSortEl = document.getElementById('finished-sort');
         finishedSortEl.style.display = '';
         const sortBtns = finishedSortEl.querySelectorAll('.sort-btn');
@@ -909,6 +932,7 @@
 
         const renderFinishedSorted = () => {
           finishedList.innerHTML = '';
+          finishedList.style.display = viewMode === 'list' ? 'block' : '';
           const { key, dir } = sortState;
           const asc = dir === 'asc';
           const sorted = [...finished];
@@ -922,10 +946,16 @@
             default:        sorted.sort((a, b) => { const at = tsOf(a,'finishedAt')||tsOf(a,'addedAt'), bt = tsOf(b,'finishedAt')||tsOf(b,'addedAt'); return asc ? at - bt : bt - at; });
           }
           if (!sorted.length) { showEmpty(finishedList, 'finished-empty', 'No finished books yet.'); return; }
-          sorted.forEach(b => { const cell = makeBookCoverCell(b); attachCell(cell, b); finishedList.appendChild(cell); });
+          sorted.forEach(b => {
+            if (viewMode === 'list' && listAttachFn) {
+              const row = makeBookListRow(b); listAttachFn(row, b); finishedList.appendChild(row);
+            } else {
+              const cell = makeBookCoverCell(b); attachCell(cell, b); finishedList.appendChild(cell);
+            }
+          });
           const q = (document.getElementById('library-filter')?.value || '').trim().toLowerCase();
-          if (q) finishedList.querySelectorAll('.library-cover-cell').forEach(cell => {
-            cell.style.display = (cell.dataset.title.includes(q) || cell.dataset.author.includes(q)) ? '' : 'none';
+          if (q) finishedList.querySelectorAll('[data-title]').forEach(el => {
+            el.style.display = (el.dataset.title.includes(q) || el.dataset.author.includes(q)) ? '' : 'none';
           });
         };
 
@@ -943,7 +973,8 @@
         updateSortUI();
         renderFinishedSorted();
 
-        // Background-fetch release years for books that don't have them stored
+        // Background-fetch release years
+
         const missing = finished.filter(b => b.gbid && b.releaseYear == null);
         if (missing.length) {
           (async () => {
@@ -965,20 +996,39 @@
             } catch (e) { console.error('release year fetch:', e); }
           })();
         }
+        return renderFinishedSorted;
       }
+
+      let renderReadingFn    = () => {};
+      let reRenderFinishedFn = () => {};
 
       if (isOwn) {
         const { reading, finished } = sortBooks(await getBooks(user.uid));
         setTitles(reading, finished);
 
-        if (reading.length === 0) showEmpty(readingList, 'reading-empty', 'Nothing in progress.');
-        else reading.forEach(b => {
-          const cell = makeBookCoverCell(b);
-          attachReadingCell(cell, b);
-          readingList.appendChild(cell);
-        });
+        renderReadingFn = () => {
+          readingList.innerHTML = '';
+          readingList.style.display = viewMode === 'list' ? 'block' : '';
+          if (!reading.length) { showEmpty(readingList, 'reading-empty', 'Nothing in progress.'); return; }
+          reading.forEach(b => {
+            if (viewMode === 'list') {
+              const row = makeBookListRow(b);
+              row.addEventListener('click', () => { let ov; const c = renderReading(b, row, () => ov?.remove()); ov = createBookModal(c); });
+              readingList.appendChild(row);
+            } else {
+              const cell = makeBookCoverCell(b);
+              attachReadingCell(cell, b);
+              readingList.appendChild(cell);
+            }
+          });
+        };
+        renderReadingFn();
 
-        setupFinishedSort(finished, (cell, b) => attachFinishedCell(cell, b));
+        reRenderFinishedFn = setupFinishedSort(
+          finished,
+          (cell, b) => attachFinishedCell(cell, b),
+          (row,  b) => { row.addEventListener('click', () => { let ov; const c = renderFinished(b, row, () => ov?.remove()); ov = createBookModal(c); }); }
+        );
       } else {
         document.getElementById('add-book-card').style.display = 'none';
         const backLink = document.getElementById('back-link');
@@ -986,33 +1036,79 @@
         backLink.addEventListener('click', e => { if (history.length > 1) { e.preventDefault(); history.back(); } });
 
         const target = await getProfileByUsername(viewUser);
-        if (!target) {
-          // user not found
-        } else {
+        if (target) {
           const { reading, finished } = sortBooks(await getBooks(target.uid));
           setTitles(reading, finished);
 
-          if (reading.length === 0) showEmpty(readingList, 'reading-empty', 'Nothing in progress.');
-          else reading.forEach(b => {
-            const cell = makeBookCoverCell(b);
-            cell.addEventListener('click', () => createBookModal(renderReadingView(b)));
-            readingList.appendChild(cell);
-          });
+          renderReadingFn = () => {
+            readingList.innerHTML = '';
+            readingList.style.display = viewMode === 'list' ? 'block' : '';
+            if (!reading.length) { showEmpty(readingList, 'reading-empty', 'Nothing in progress.'); return; }
+            reading.forEach(b => {
+              if (viewMode === 'list') {
+                const row = makeBookListRow(b);
+                row.addEventListener('click', () => createBookModal(renderReadingView(b)));
+                readingList.appendChild(row);
+              } else {
+                const cell = makeBookCoverCell(b);
+                cell.addEventListener('click', () => createBookModal(renderReadingView(b)));
+                readingList.appendChild(cell);
+              }
+            });
+          };
+          renderReadingFn();
 
-          setupFinishedSort(finished, (cell, b) => cell.addEventListener('click', () => createBookModal(renderFinishedView(b))));
+          reRenderFinishedFn = setupFinishedSort(
+            finished,
+            (cell, b) => cell.addEventListener('click', () => createBookModal(renderFinishedView(b))),
+            (row,  b) => { row.addEventListener('click', () => createBookModal(renderFinishedView(b))); }
+          );
         }
       }
-      if (readingList.querySelector('.library-cover-cell') || finishedList.querySelector('.library-cover-cell')) {
+      if (readingList.querySelector('[data-title]') || finishedList.querySelector('[data-title]')) {
         const filterWrap  = document.getElementById('library-filter-wrap');
         const filterInput = document.getElementById('library-filter');
+        const gridBtn     = document.getElementById('view-grid-btn');
+        const listBtn     = document.getElementById('view-list-btn');
         filterWrap.style.display = '';
-        filterInput.addEventListener('input', () => {
+
+        function applyFilter() {
           const q = filterInput.value.trim().toLowerCase();
           [readingList, finishedList].forEach(container => {
-            container.querySelectorAll('.library-cover-cell').forEach(cell => {
-              cell.style.display = (!q || cell.dataset.title.includes(q) || cell.dataset.author.includes(q)) ? '' : 'none';
+            container.querySelectorAll('[data-title]').forEach(el => {
+              el.style.display = (!q || el.dataset.title.includes(q) || el.dataset.author.includes(q)) ? '' : 'none';
             });
           });
+        }
+        filterInput.addEventListener('input', applyFilter);
+
+        function updateToggleUI() {
+          gridBtn.style.opacity = viewMode === 'grid' ? '1' : '0.45';
+          listBtn.style.opacity = viewMode === 'list' ? '1' : '0.45';
+        }
+        updateToggleUI();
+
+        gridBtn.addEventListener('click', () => {
+          if (viewMode === 'grid') return;
+          viewMode = 'grid';
+          localStorage.setItem('library-view', 'grid');
+          updateToggleUI();
+          readingList.innerHTML = '';
+          finishedList.innerHTML = '';
+          renderReadingFn();
+          reRenderFinishedFn?.();
+          applyFilter();
+        });
+        listBtn.addEventListener('click', () => {
+          if (viewMode === 'list') return;
+          viewMode = 'list';
+          localStorage.setItem('library-view', 'list');
+          updateToggleUI();
+          readingList.innerHTML = '';
+          finishedList.innerHTML = '';
+          renderReadingFn();
+          reRenderFinishedFn?.();
+          applyFilter();
         });
       }
     } finally {
