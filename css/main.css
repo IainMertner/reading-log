@@ -1095,6 +1095,38 @@ body.auth-loading { visibility: hidden; animation: auth-reveal 0s 8s forwards; }
 .suggestion-title { font-size: .85rem; font-weight: 500; line-height: 1.3; }
 .suggestion-meta  { font-size: .72rem; color: var(--text-muted); margin-top: .1rem; }
 
+/* ── Search results ─────────────────────────────────────────── */
+.search-result-row {
+  display: flex;
+  align-items: center;
+  gap: .875rem;
+  padding: .625rem 0;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+  transition: background .1s;
+  border-radius: var(--radius-sm);
+}
+.search-result-row:last-child { border-bottom: none; }
+.search-result-row:hover { background: var(--bg-alt); padding-left: .5rem; padding-right: .5rem; margin: 0 -.5rem; }
+.search-result-cover {
+  width: 42px;
+  height: 63px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.search-result-cover-placeholder {
+  width: 42px;
+  height: 63px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.search-result-title { font-size: .9rem; font-weight: 500; line-height: 1.3; }
+.search-result-meta  { font-size: .78rem; color: var(--text-muted); margin-top: .2rem; }
+
 /* ── Clickable stars (finished book cards) ──────────────────── */
 .stars-clickable { cursor: pointer; display: inline-block; margin-top: .2rem; }
 
